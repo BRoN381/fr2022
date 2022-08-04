@@ -25,11 +25,13 @@ def cupdetect(frame):
     lowbound = 280
     boundary = [0, 0, 0, 0]
     for i in range(width):
+        i=i+3;
         pixel = 0
         pixelcount[i] = 0
         num = np.uint8(0)
         #chop the image
         for j in range(upbound, lowbound):
+            j=j+3;
             if (frame[j][i][0] != num or frame[j][i][1] != num or frame[j][i][2] != num):
                 pixel += 1
         if pixel > 25:
