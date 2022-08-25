@@ -25,15 +25,16 @@ def cupdetect(frame):
     lowbound = 280
     boundary = [0, 0, 0, 0]
     for i in range(width):
-        i=i+3;
         pixel = 0
         pixelcount[i] = 0
         num = np.uint8(0)
         #chop the image
         for j in range(upbound, lowbound):
-            j=j+3;
             if (frame[j][i][0] != num or frame[j][i][1] != num or frame[j][i][2] != num):
                 pixel += 1
+            j=j+3
+            if j > upbound:
+                break;
         if pixel > 25:
             pixelcount[i] = pixel
         #clear if density too small
@@ -57,6 +58,9 @@ def cupdetect(frame):
                     boundary[2] = i
                 else:
                     boundary[3] = i
+        i=i+3
+        if i > width:
+            break;
     leftdiff = boundary[1] - boundary[0]
     rightdiff = boundary[3] - boundary[2]
     print('boundary:', boundary)
