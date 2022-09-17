@@ -13,8 +13,8 @@ arrowcount = [0, 0, 0]
 def cupdetect(frame):
     #mask for grass
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lower_bound = np.array([0, 103, 152])
-    upper_bound = np.array([179, 225, 255])
+    lower_bound = np.array([0, 0, 0])
+    upper_bound = np.array([255, 225, 255])
     mask = cv2.inRange(hsv, lower_bound, upper_bound)
     frame = cv2.bitwise_and(frame, frame, mask=mask)
     height = frame.shape[0]
@@ -24,17 +24,14 @@ def cupdetect(frame):
     upbound = 120
     lowbound = 280
     boundary = [0, 0, 0, 0]
-    for i in range(width):
+    for i in range(0, width, 3):
         pixel = 0
         pixelcount[i] = 0
         num = np.uint8(0)
         #chop the image
-        for j in range(upbound, lowbound):
+        for j in range(upbound, lowbound, 3):
             if (frame[j][i][0] != num or frame[j][i][1] != num or frame[j][i][2] != num):
                 pixel += 1
-            j=j+3
-            if j > upbound:
-                break;
         if pixel > 25:
             pixelcount[i] = pixel
         #clear if density too small
@@ -58,9 +55,6 @@ def cupdetect(frame):
                     boundary[2] = i
                 else:
                     boundary[3] = i
-        i=i+3
-        if i > width:
-            break;
     leftdiff = boundary[1] - boundary[0]
     rightdiff = boundary[3] - boundary[2]
     print('boundary:', boundary)
@@ -91,14 +85,14 @@ def cupdetect(frame):
     print(motorspeed)
     cv2.imshow('cup', frame)
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 counter = 0
 while True:
     try:
         ret, frame = cap.read()
         imgcontours = frame.copy()
-
-        cupdetect(frame)  
+        resize = cv2.resize(frame, (640, 480))
+        cupdetect(resize)  
         if cv2.waitKey(1) == ord('q'):
             break
     except KeyboardInterrupt():
