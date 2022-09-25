@@ -9,11 +9,16 @@ for i in range(640):
 motorspeed = ['2'] # 1 = left, 2 = mid, 3 = right
 boundary = [0, 0, 0, 0]
 arrowcount = [0, 0, 0]
+turnratio = 20
+left = 0
+right = 0
+moveratio = 0
+
 
 def cupdetect(frame):
     #mask for grass
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    lower_bound = np.array([0, 0, 0])
+    lower_bound = np.array([0, 0, 255])
     upper_bound = np.array([255, 225, 255])
     mask = cv2.inRange(hsv, lower_bound, upper_bound)
     frame = cv2.bitwise_and(frame, frame, mask=mask)
@@ -66,6 +71,7 @@ def cupdetect(frame):
             output = '1'
     else:
         output = '2'
+    moveratio = (leftdiff-rightdiff)*turnratio
     #show density
     for i in range(640):
         if pixelcount[i] != 0:
@@ -76,13 +82,16 @@ def cupdetect(frame):
     frame = cv2.line(frame, (boundary[3], 480), (boundary[3], 0), (0, 0, 255), 1)
     frame = cv2.line(frame, (0, upbound), (640, upbound), (0, 0, 255), 1)
     frame = cv2.line(frame, (0, lowbound), (640, lowbound), (0, 0, 255), 1)
-    if abs(leftdiff-rightdiff) < 70:
+    if abs(leftdiff-rightdiff) < 25:
         cv2.putText(frame, "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
     elif leftdiff > rightdiff:
         cv2.putText(frame, "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
     else:
         cv2.putText(frame, "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
     print(motorspeed)
+    left = 0 - moveratio 
+    right = 0 + moveratio
+    print(left, right)
     cv2.imshow('cup', frame)
 
 cap = cv2.VideoCapture(1)
