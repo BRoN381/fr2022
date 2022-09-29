@@ -1,29 +1,38 @@
 #include <LiquidCrystal.h> 
+#include <Stepper.h>
 #include <Servo.h>
-int rpwm, lpwm, sign, stepm, water, servom, color;
+int rpwm, lpwm, sign, stepm, water, servom, color, perviousServom;
 
-const int inputPinLoc[4] = {38,39};  //tba
-const int outputPinLoc[9] = {A0,2,3,4,5,6,7,8,9};   //A0 servo, 2~5 main motor, 6~9 step motor
+const int inputPinLoc[2] = {38,39};  //tba
+const int outputPinLoc[10] = {A0,2,3,4,5,6,7,8,9,20};   //A0 servo, 2~5 main motor, 6~9 step motor, 20 water relay
 const int buttonPin[5] = {34,35,36,37,38}; //34 state lock, 35~38 four states
 const int motorPin[4] = {2,3,4,5}; //left forward, left backward, right forward, right backward
 const int motorSpeed = 150; //default speed before p-control
 const int triangleTurnSpeed[6] = {150,150,150,150,1000,1000}; //left forward, left backward, right forward, right backward, left turn time, right turn time
 const int squareTurnSpeed[3] = {150,150,1000}; //left forward, right backward, turn time
 const int circleTurnSpeed[3] = {150,150,2000}; //left forward, right backward, turn time
+const int clawAngle[2] = {25, 135}; //0 open, 1 close
+const int stepsPerRevolution = 2048; 
+String colorArray[5] = {"none", "red", "yellow", "blue", "black"};
 
-LiquidCrystal lcd(1,2,3,4,5,6);//to be asure
+Stepper myStepper(stepsPerRevolution, 6, 7, 8, 9);
+LiquidCrystal lcd(1,2,3,4,5,6);//to be assure
 Servo clawServo;
 
 void readSerial();
 void stopMotor();
 void moveMotor(int left, int right);  //main moving code
-void readSign();
+void readSign();  //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
 void sign0(); //move while checking claw code
 void triangleTurn(bool type); //triangle sign, true for left, false for right
 void squareTurn();  //90 degree turn
 void circleTurn();  //180 degree turn
 void readStateButton(); //manual change state
 void printLcd(String str1, String str2);
+void claw(); //0 open, 1 close
+void stepper(); //0 stop, 1 forward, 2 backward
+void watering();  //0 off, 1 on
+void colorDisplay();  //0 off, 1 red, 2 yellow, 3 blue, 4 black
 
 void setup() {
   for (int i = 0; i < 9; i++) pinMode(outputPinLoc[i], OUTPUT);
@@ -33,13 +42,13 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.clear();
   clawServo.attach(A0);
+  clawServo.write(clawAngle[0]);
 }
 
 void loop() {
   readSerial();
   readSign();
   readStateButton();
-    
 }
 
 void stopMotor(){
@@ -94,7 +103,10 @@ void readSerial(){
 
 void sign0(){
   moveMotor(lpwm, rpwm);
-  
+  claw();
+  stepper();
+  watering();
+  colorDisplay();
 }
 
 void readSign(){
@@ -140,4 +152,30 @@ void printLcd(String str1, String str2){
   lcd.print(str1);
   lcd.setCursor(0,1);
   lcd.print(str2);
+}
+
+void claw(){ 
+  if(servom != perviousServom){
+    clawServo.write(clawAngle[servom]);
+    delay(500);
+    servom = perviousServom;
+  }
+}
+
+void stepper(){
+  if (stepm == 1){
+    myStepper.step(1);
+  }
+  else if (stepm == 2){
+    myStepper.step(-1);
+  }
+}
+
+void watering(){  //0 off, 1 on
+  if(water == 0) digitalWrite(outputPinLoc[9],LOW);
+  else digitalWrite(outputPinLoc[9],HIGH);
+}
+
+void colorDisplay(){ //0 off, 1 red, 2 yellow, 3 blue, 4 black
+  if (color != 0) printLcd("The color is:", colorArray[color]);
 }
