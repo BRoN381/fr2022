@@ -178,4 +178,5 @@ void watering(){  //0 off, 1 on
 
 void colorDisplay(){ //0 off, 1 red, 2 yellow, 3 blue, 4 black
   if (color != 0) printLcd("The color is:", colorArray[color]);
+  else lcd.clear();
 }
