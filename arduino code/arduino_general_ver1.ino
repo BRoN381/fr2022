@@ -1,4 +1,4 @@
-#include <LiquidCrystal.h> 
+#include <LiquidCrystal_I2C.h> 
 #include <Stepper.h>
 #include <Servo.h>
 int rpwm, lpwm, sign, stepm, water, servom, color, perviousServom;
@@ -16,7 +16,7 @@ const int stepsPerRevolution = 2048;
 String colorArray[5] = {"none", "red", "yellow", "blue", "black"};
 
 Stepper myStepper(stepsPerRevolution, 6, 7, 8, 9);
-LiquidCrystal lcd(1,2,3,4,5,6);//to be assure
+LiquidCrystal_I2C lcd(0x27, 21, 22);
 Servo clawServo;
 
 void readSerial();
