@@ -12,7 +12,7 @@ for i in range(640):
 motorspeed = ['2'] # 1 = left, 2 = mid, 3 = right
 boundary = [0, 0, 0, 0]
 arrowcount = [0, 0, 0]
-turnratio = 20
+turnratio = 0.5
 left = 0
 right = 0
 moveratio = 0
@@ -95,7 +95,13 @@ def cupdetect(frame):
     print(motorspeed)
     left = 128 - moveratio 
     right = 128 + moveratio
-    serialOutput = str(left) + str(right) + "000" 
+    left_str = str(left)
+    right_str = str(right)
+    if right < 100:
+        right_str = '0' + right_str
+    if left < 100:
+        left_str = '0' + left_str
+    serialOutput = left_str + right_str + "000" 
     print(serialOutput)
     cv2.imshow('cup', frame)
 
