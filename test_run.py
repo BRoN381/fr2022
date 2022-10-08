@@ -95,8 +95,8 @@ def cupdetect(frame):
     print(motorspeed)
     left = 128 - moveratio 
     right = 128 + moveratio
-    left_str = str(left)
-    right_str = str(right)
+    left_str = str(int(left))
+    right_str = str(int(right))
     if right < 100:
         right_str = '0' + right_str
     if left < 100:
