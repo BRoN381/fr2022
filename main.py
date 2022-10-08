@@ -1,26 +1,61 @@
-import numpy as np
 import cv2
+from getcontours import getContours
+import numpy as np
+import serial
+from cup import cupdetect
 
-def getContours(imgcontours):
-    grey = cv2.cvtColor(imgcontours, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(grey, (5,5), 0)
-    edge = cv2.Canny(blur, 100, 255)
-    kernel = np.ones((4,4))
-    dilate = cv2.dilate(edge, kernel, 1)
-    opening = cv2.morphologyEx(dilate, cv2.MORPH_OPEN, kernel)
-    contours, hierarchy = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    for i in contours:
-        area = cv2.contourArea(i)
-        if area > 1500:
-            arclen = cv2.arcLength(i, True)
-            approx = cv2.approxPolyDP(i, arclen*0.02, True)
-    return 0
+ser = serial.Serial('', 9600)
+state = 1
 
+cap = cv2.VideoCapture(1)
 while True:
-    cap = cv2.VideoCapture(0)
     ret, frame = cap.read()
     imgcontours = frame.copy()
-    arrowresult = getContours(imgcontours)
+    resize = cv2.resize(frame, (640, 480))
+
+    if(state == 0):
+        getContours(resize, state)
+        #detect shape, direction
+
+    elif(state == 1):
+        getContours(resize, state)
+        #detectcolor
+    
+    elif(state == 2):
+        getContours(resize, state)
+        #fruitdetect
+
+    elif(state == 3):
+        getContours(resize, state)
+
+    elif(state == 4):
+        getContours(resize, state)
+
+    elif(state == 5):
+        getContours(resize, state)
+        #getcolor
+
+    elif(state == 6):
+        getContours(resize, state)
+        #waterspay
+    
+    elif(state == 7):
+        getContours(resize, state)
+
+    elif(state == 8):
+        getContours(resize, state)
+
+    elif(state == 9):
+        getContours(resize, state)
+
+    #use case
+    
+
+
+
+    
+
+
 
 
 

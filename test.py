@@ -29,7 +29,7 @@ while True:
     cap = cv2.VideoCapture(0)
     success, img = cap.read()
     imgContour = img.copy()
-    img = cv2.resize(img, (640, 480))
+    #img = cv2.resize(img, (640, 480))
     imgBlur = cv2.GaussianBlur(img, (7, 7), 1)
     imgGray = cv2.cvtColor(imgBlur, cv2.COLOR_BGR2GRAY)
     # threshold1 = cv2.getTrackbarPos("Threshold1", "Parameters")
