@@ -101,7 +101,7 @@ def cupdetect(frame):
         right_str = '0' + right_str
     if left < 100:
         left_str = '0' + left_str
-    serialOutput = left_str + right_str + "000" 
+    serialOutput = left_str + right_str 
     #ser.write(serialOutput)
     print(serialOutput)
     cv2.imshow('cup', frame)
