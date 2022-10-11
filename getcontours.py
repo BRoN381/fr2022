@@ -1,9 +1,9 @@
 import numpy as np
 import cv2
 import serial
-import cup
+# import cup
 
-ser = serial.Serial('', 9600)
+# ser = serial.Serial('', 9600)
 
 def getContours(imgcontours, state):
     grey = cv2.cvtColor(imgcontours, cv2.COLOR_BGR2GRAY)
@@ -25,7 +25,7 @@ while True:
     ret, frame = cap.read()
     imgcontours = frame.copy()
     arrowresult = getContours(imgcontours)
-    cup.cupdetect()
+    # cup.cupdetect()
     
 
 

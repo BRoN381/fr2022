@@ -1,1 +1,1 @@
-serialOutput = ""
+ser = serial.Serial('', 9600)
