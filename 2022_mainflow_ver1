@@ -1,0 +1,230 @@
+import cv2
+import numpy as np
+import serial
+from time import sleep
+
+ser = serial.Serial('COM14', 9600)
+motorOutput = ""
+taskOutput = ""
+motorOrTask = True 	#decide to send which output to arduino (true motor/ false task)
+signCode, signCounter, colorCounter = 0
+pixelcount = []
+for i in range(640):
+    pixelcount.append(0)
+turnratio = 0.3
+#						sign 			pot 			tube 		   red 			yellow 			blue 			black
+maskLowwerBound = [[  3,177,164], [  0,  85,  67], [255,255,255], [255,255,255], [255,255,255], [255,255,255], [255,255,255]]
+maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [255,255,255], [255,255,255], [255,255,255], [255,255,255], [255,255,255]]
+maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask']) 
+state = 0
+
+def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
+	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
+	sideHsv=cv2.cvtColor(sideFrame,cv2.COLOR_BGR2HSV)
+	waterHsv=cv2.cvtColor(waterFrame,cv2.COLOR_BGR2HSV)
+	for i in range(3):	#mask sign, pot, tube
+	    mask = cv2.inRange(frontHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
+	    maskName[list(maskName)[i]] = cv2.bitwise_and(frontHsv,frontHsv,mask=mask)
+	for i in range(3, 7):	#mask side four color
+		mask = cv2.inRange(sideHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
+	    maskName[list(maskName)[i]] = cv2.bitwise_and(sideHsv,sideHsv,mask=mask)
+	for i in range(7, 11):	#mask water four color
+		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
+	    maskName[list(maskName)[i]] = cv2.bitwise_and(waterHsv,waterHsv,mask=mask)
+
+def signDetect():	#input: mask sign img/ output: (int)signCode (0: None, 1: left tri, 2: right tri, 3: square, 4: circle) and return True
+    contours, hierarchy = cv2.findContours(maskName['signMask'], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  # 回傳兩個值，第一個值是輪廓，第二個值是階層
+    # x,y,w,h=-1,-1,-1,-1
+    for cnt in contours:
+        # print(cnt)#輪廓點的數字,顯示在run的結果
+        area = cv2.contourArea(cnt)  # 輪廓面積
+        if area > 10000:  # 扣除雜訊
+            peri = cv2.arcLength(cnt, True)  # 輪廓邊長(輪廓,輪廓是否閉合)
+            vertices = cv2.approxPolyDP(cnt, peri * 0.02, True)  # 用多邊形近似輪廓(輪廓,近似值,輪廓是否閉合)會回傳多邊形頂點
+            corners = len(vertices)  # 有幾個頂點
+            x, y, w, h = cv2.boundingRect(vertices)  # 回傳四個值:左上角的x、左上角的y值、寬度、高度
+            cv2.drawContours(signShow, cnt, -1, (0, 255, 0), 3)  # (畫在哪,要畫的輪廓,要畫的輪廓是第幾個-1表每一個都畫,顏色,粗度)
+            if corners==3:#是個三角形
+                #cv2.putText(signShow,"triangle",(x,y-5),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
+                newapp = np.ravel(vertices)
+                flag_y, flag_x, sec_y, sec_x = 0
+                for i in range(1, len(newapp), 2):
+                    if newapp[i] > flag_y:
+                        sec_y = flag_y
+                        sec_x = flag_x
+                        flag_y = newapp[i]
+                        flag_x = newapp[i - 1]
+                    elif newapp[i] > sec_y:
+                        sec_y = newapp[i]
+                        sec_x = newapp[i - 1]
+                if flag_x >= sec_x:
+                    cv2.putText(signShow, "left", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    signCode = 1
+                    return True
+                elif flag_x <= sec_x:
+                    cv2.putText(signShow, "right", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    signCode = 2
+                    return True
+            elif corners == 4: #是個正方形
+                cv2.putText(signShow, "rectangle", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                signCode = 3
+                return True
+            elif corners == 8:  # 是個正方形
+                cv2.putText(signShow, "circle", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                signCode = 4
+                return True
+    return False
+
+def potDetect():	#input: mask pot img/ output: (change global variable) motorOutput
+    firstcoor = -1
+    upbound = 120
+    lowbound = 280
+    boundary = [0, 0, 0, 0]
+    for i in range(0, 640):
+        pixel = 0
+        pixelcount[i] = 0
+        num = np.uint8(0)
+        #chop the image
+        for j in range(upbound, lowbound):
+            if (potMask[j][i][0] != num or potMask[j][i][1] != num or potMask[j][i][2] != num): 
+            	pixel += 1
+        if pixel > 25:
+            pixelcount[i] = pixel
+        #clear if continuous density too small
+            if firstcoor == -1:
+                firstcoor = i
+        elif firstcoor != -1:
+            if i - firstcoor < 10:
+                for j in range(firstcoor, i):
+                    pixelcount[j] = 0
+            firstcoor = -1
+        #find range for left and right
+        if i < 320:
+            if pixelcount[i] != 0:
+                if boundary[0] == 0:
+                    boundary[0] = i
+                else:
+                    boundary[1] = i
+        elif i >= 320:
+            if pixelcount[i] != 0:
+                if boundary[2] == 0:
+                    boundary[2] = i
+                else:
+                    boundary[3] = i
+    leftdiff = boundary[1] - boundary[0]
+    rightdiff = boundary[3] - boundary[2]
+    moveratio = (leftdiff-rightdiff)*turnratio
+    #show density
+    for i in range(640):
+        if pixelcount[i] != 0:
+		    potMask = cv2.line(potMask, (i, 480), (i, 480-pixelcount[i]), (255, 255, 0), 1)
+		    potMask = cv2.line(potMask, (boundary[0], 480), (boundary[0], 0), (0, 0, 255), 1)
+		    potMask = cv2.line(potMask, (boundary[1], 480), (boundary[1], 0), (0, 0, 255), 1)
+		    potMask = cv2.line(potMask, (boundary[2], 480), (boundary[2], 0), (0, 0, 255), 1)
+		    potMask = cv2.line(potMask, (boundary[3], 480), (boundary[3], 0), (0, 0, 255), 1)
+		    potMask = cv2.line(potMask, (0, upbound), (640, upbound), (0, 0, 255), 1)
+		    potMask = cv2.line(potMask, (0, lowbound), (640, lowbound), (0, 0, 255), 1)
+    if abs(leftdiff-rightdiff) < 25:
+        cv2.putText(potMask, "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+    elif leftdiff > rightdiff:
+        cv2.putText(potMask, "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+    else:
+        cv2.putText(potMask, "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+    left = 128 + moveratio 
+    right = 128 - moveratio
+    left_str = str(int(left))
+    right_str = str(int(right))
+    if right < 100:
+        right_str = '0' + right_str
+    if left < 100:
+        left_str = '0' + left_str
+    potOutput = left_str + right_str +'\n'
+    print('boundary:', boundary)
+    print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
+    print(serialOutput)
+    cv2.imshow('cup', potMask)
+
+def colorDetect():	#input: four color mask img/ output: (change global variable) colorSign and return True
+
+def fruitDetect():	#input: four color mask img/ output: loop until get fruit and return True
+
+def waterDetect():	#input: four color mask img/ output: loop until water
+
+def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
+
+def potAndSign(currentState):
+	potDetect()
+		if signDetect():
+			if signCounter > 3:		# counter to be tested
+				motorOrTask = False
+				sleep(2)
+				state = currentState + 1
+				signCounter = 0
+			else:
+				signCounter += 1
+		else:
+			signCounter = 0
+
+def potAndColor(currentState):
+	potDetect()
+		if colorDetect():
+			if colorCounter > 3:
+				state = 1 + currentState
+				colorCounter = 0
+			else:
+				colorCounter += 1
+		else:
+			colorCounter = 0
+
+def switch():
+	if state == 0:
+		potAndSign(state)
+	elif state == 1:
+		potAndColor(state)
+	elif state == 2:
+		potDetect()
+		if fruitDetect():
+			state = 3
+	elif state == 3:
+		potAndSign(state)
+	elif state == 4:
+		potAndSign(state)
+	elif state == 5:
+		potAndColor(state)
+	elif state == 6:
+		potDetect()
+		if waterDetect():
+			state = 7
+	elif state == 7:
+		potAndSign(state)
+	elif state == 8:
+		potAndSign(state)
+	elif state == 9:
+		tubeDetect
+
+frontCap = cv2.VideoCapture(0)
+sideCap = cv2.VideoCapture(1)
+waterCap = cv2.VideoCapture(2)
+
+while True:
+    ret1, frontFrame = frontCap.read()
+    ret2, sideFrame = sideCap.read()
+    ret3, waterFrame = waterCap.read()
+    if ret1 and ret2 and ret3:
+    	signShow = frontFrame.copy()
+    	maskAll()
+        switch()
+
+        if motorOrTask:
+        	ser.write(motorOutput.encode('utf-8'))
+        else:
+        	ser.write(taskOutput.encode('utf-8'))
+        	motorOrTask = True
+
+    while ser.in_waiting:
+    	state = int(ser.readline().decode())
+
+    if cv2.waitKey(1)==ord("q")
+        break
+cap.release()
+cv2.destroyAllWindows()
