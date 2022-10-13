@@ -5,16 +5,21 @@ from time import sleep
 
 ser = serial.Serial('COM14', 9600)
 motorOutput = ""
-taskOutput = ""
+taskOutput = "900000"
 motorOrTask = True 	#decide to send which output to arduino (true motor/ false task)
-signCode, signCounter, colorCounter = 0
+signCode = 0
+signCounter = 0
+colorCounter = 0
 pixelcount = []
 for i in range(640):
     pixelcount.append(0)
-turnratio = 0.3
+
+rf = Roboflow(api_key="9TAvQYtv7pJPJpRoNOrh")
+project = rf.workspace().project("fruit_detect_model_2.0")
+model = project.version(1).model
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  3,177,164], [  0,  85,  67], [255,255,255], [255,255,255], [255,255,255], [255,255,255], [255,255,255]]
-maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [255,255,255], [255,255,255], [255,255,255], [255,255,255], [255,255,255]]
+maskLowwerBound = [[  3,177,164], [  0,  85,  67], [  0,121,121], [255,255,255], [255,255,255], [255,255,255], [255,255,255]]
+maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [ 11,255,255], [255,255,255], [255,255,255], [255,255,255], [255,255,255]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask']) 
 state = 0
 
@@ -29,7 +34,7 @@ def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign
 		mask = cv2.inRange(sideHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
 	    maskName[list(maskName)[i]] = cv2.bitwise_and(sideHsv,sideHsv,mask=mask)
 	for i in range(7, 11):	#mask water four color
-		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
+		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
 	    maskName[list(maskName)[i]] = cv2.bitwise_and(waterHsv,waterHsv,mask=mask)
 
 def signDetect():	#input: mask sign img/ output: (int)signCode (0: None, 1: left tri, 2: right tri, 3: square, 4: circle) and return True
@@ -76,6 +81,7 @@ def signDetect():	#input: mask sign img/ output: (int)signCode (0: None, 1: left
     return False
 
 def potDetect():	#input: mask pot img/ output: (change global variable) motorOutput
+	turnratio = 0.3
     firstcoor = -1
     upbound = 120
     lowbound = 280
@@ -138,26 +144,117 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
         right_str = '0' + right_str
     if left < 100:
         left_str = '0' + left_str
-    potOutput = left_str + right_str +'\n'
+    motorOutput = left_str + right_str +'\n'
     print('boundary:', boundary)
     print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
-    print(serialOutput)
+    print(motorOutput)
     cv2.imshow('cup', potMask)
 
 def colorDetect():	#input: four color mask img/ output: (change global variable) colorSign and return True
 
 def fruitDetect():	#input: four color mask img/ output: loop until get fruit and return True
+	fruitFrame = cv2.resize(sideFrame, (0, 0), fx=1.2, fy=1.2)
+    cv2.imwrite('fruitFrame.jpg',fruitFrame)
+    prediction = model.predict('fruitFrame.jpg', confidence=40, overlap=30)
+    # cv2.imshow('video', frame)
+    # infer on a local image
+    print(prediction.json())
+    print(prediction)
+    print(prediction.plot())
+
+    for i in range (len(prediction)) :
+        if(prediction[i]["class"] == queryfruit):
+            x = prediction[i]["x"]
+            y = prediction[i]["y"]
+            width = prediction[i]["width"]
+            height = prediction[i]["height"]
+            volume = width*height
+            print('x:', x, ' y:',y)
+            print('volume:', volume)
 
 def waterDetect():	#input: four color mask img/ output: loop until water
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
+	turnratio = 0.1
+	upbound = 120
+    lowbound = 280
+    boundary = [0, 0, 0, 0]
+    luCounter = 0
+    llCounter = 0
+    ruCounter = 0
+    rlCounter = 0
+    for i in range(0, 320):
+        num = np.uint8(0)
+        #chop the image
+        if boundary[0] == 0:
+            if (tubeMask[upbound][i][0] != num or tubeMask[upbound][i][1] != num or tubeMask[upbound][i][2] != num):
+                if luCounter > 2:
+                    boundary[0] = i
+                    cv2.circle(tubeMask, (i, upbound), 5, (255, 204, 0), -1)
+                else :
+                    luCounter += 1
+            else:
+                luCounter = 0
+        if boundary[1] == 0:
+            if (tubeMask[lowbound][i][0] != num or tubeMask[lowbound][i][1] != num or tubeMask[lowbound][i][2] != num):
+                if llCounter > 2:
+                    boundary[1] = i
+                    cv2.circle(tubeMask, (i, lowbound), 5, (255, 204, 0), -1)
+                else :
+                    llCounter += 1
+            else:
+                llCounter = 0
+    for i in range(320, 640):
+        num = np.uint8(0)
+        #chop the image
+        if boundary[2] == 0:
+            if (tubeMask[upbound][i][0] != num or tubeMask[upbound][i][1] != num or tubeMask[upbound][i][2] != num):
+                if ruCounter > 2:
+                    boundary[2] = i
+                    cv2.circle(tubeMask, (i, upbound), 5, (255, 204, 0), -1)
+                else :
+                    ruCounter += 1
+            else:
+                ruCounter = 0
+        if boundary[3] == 0:
+            if (tubeMask[lowbound][i][0] != num or tubeMask[lowbound][i][1] != num or tubeMask[lowbound][i][2] != num):
+                if rlCounter > 2:
+                    boundary[3] = i
+                    cv2.circle(tubeMask, (i, lowbound), 5, (255, 204, 0), -1)
+                else :
+                    rlCounter += 1
+            else:
+                rlCounter = 0
+        
+    leftdiff = abs(boundary[1] - boundary[0])
+    rightdiff = abs(boundary[3] - boundary[2])
+    print('boundary:', boundary)
+    print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
+    moveratio = (leftdiff-rightdiff)*turnratio
+    cv2.line(tubeMask, (0, upbound), (640, upbound), (0, 0, 255), 1)
+    cv2.line(tubeMask, (0, lowbound), (640, lowbound), (0, 0, 255), 1)
+    if abs(leftdiff-rightdiff) < 20:
+        cv2.putText(tubeMask, "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+    elif leftdiff > rightdiff:
+        cv2.putText(tubeMask, "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+    else:
+        cv2.putText(tubeMask, "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+    left = 128 + moveratio 
+    right = 128 - moveratio
+    left_str = str(int(left))
+    right_str = str(int(right))
+    if right < 100:
+        right_str = '0' + right_str
+    if left < 100:
+        left_str = '0' + left_str
+    motorOutput = left_str + right_str +'\n'
+    print(motorOutput)
 
 def potAndSign(currentState):
 	potDetect()
 		if signDetect():
 			if signCounter > 3:		# counter to be tested
 				motorOrTask = False
-				sleep(2)
 				state = currentState + 1
 				signCounter = 0
 			else:
@@ -200,7 +297,7 @@ def switch():
 	elif state == 8:
 		potAndSign(state)
 	elif state == 9:
-		tubeDetect
+		tubeDetect()
 
 frontCap = cv2.VideoCapture(0)
 sideCap = cv2.VideoCapture(1)
@@ -211,10 +308,13 @@ while True:
     ret2, sideFrame = sideCap.read()
     ret3, waterFrame = waterCap.read()
     if ret1 and ret2 and ret3:
+    	frontFrame = cv2.resize(frontFrame, (640, 480))
+    	sideFrame = cv2.resize(sideFrame, (640, 480))
+    	waterFrame = cv2.resize(waterFrame, (640, 480))
     	signShow = frontFrame.copy()
     	maskAll()
         switch()
-
+ 
         if motorOrTask:
         	ser.write(motorOutput.encode('utf-8'))
         else:
@@ -226,5 +326,7 @@ while True:
 
     if cv2.waitKey(1)==ord("q")
         break
-cap.release()
+frontCap.release()
+sideCap.release()
+waterCap.release()
 cv2.destroyAllWindows()
