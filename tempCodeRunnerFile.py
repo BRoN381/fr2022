@@ -1,1 +1,2 @@
-ser = serial.Serial('', 9600)
+cap = cv2.VideoCapture(0)
+# counter = 0
