@@ -4,8 +4,8 @@ import serial
 from time import sleep
 from roboflow import Roboflow
 
-# ser = serial.Serial('COM14', 9600)
-motorOutput = ""
+ser = serial.Serial('COM5', 9600)
+motorOutput = "000000"
 taskOutput = "900000"
 motorOrTask = True 	#decide to send which output to arduino (true motor/ false task)
 variables = dict.fromkeys(['signCode', 'signCounter', 'colorCode', 'colorCounter'], 0)
@@ -15,12 +15,12 @@ pixelcount = []
 for i in range(640):
 	pixelcount.append(0)
 
-rf = Roboflow(api_key="9TAvQYtv7pJPJpRoNOrh")
-project = rf.workspace().project("fruit_detect_model_2.0")
-model = project.version(1).model
+# rf = Roboflow(api_key="9TAvQYtv7pJPJpRoNOrh")
+# project = rf.workspace().project("fruit_detect_model_2.0")
+# model = project.version(1).model
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  3,177,164], [  0,  85,  67], [  0,121,121], [  0,158,192], [ 12,184, 91], [ 95, 49,83], [  0,  0,  0]]
-maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [ 11,255,255], [ 10,255,255], [ 31,255,192], [112,255,188], [179,127, 43]]
+maskLowwerBound = [[  3,177,164], [  0,  85,  67], [  0,121,121], [  0,158,192], [ 12,184, 91], [ 86,  0,243], [  0,  0,  0]]
+maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [ 11,255,255], [ 10,255,255], [ 31,255,192], [117,192,255], [179, 95,164]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask']) 
 state = 0
 
@@ -188,34 +188,38 @@ def fruitDetect():	#input: four color mask img/ output: loop until get fruit and
 
 def waterDetect():	#input: four color mask img/ output: loop until water
 	contours, hierarchy = cv2.findContours(maskName[list(maskName)[variables['colorCode']]], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+	global motorOutput
+	global taskOutput
 	for cnt in contours:
 		area = cv2.contourArea(cnt)
-		if area > 7000:  
-			cv2.drawContours(waterFrame, cnt, -1, (128, 0, 128), 3) 
-				x, y, w, h = cv2.boundingRect(cv2.approxPolyDP(cnt, cv2.arcLength(cnt, True) * 0.02, True))
-				cv2.circle(waterFrame, (int(x+w/2), int(y+h/2)), 7, (255, 255, 255), -1)
-				if x+w/2 < 300:
-					cv2.putText(waterFrame, "motor forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-					motorOutput = '050050'
-				elif x+w/2 > 340:
-					cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-					motorOutput = '850850'
+		if area > 7000:
+			cv2.drawContours(waterFrame, cnt, -1, (128, 0, 128), 3)
+			x, y, w, h = cv2.boundingRect(cv2.approxPolyDP(cnt, cv2.arcLength(cnt, True) * 0.02, True))
+			cv2.circle(waterFrame, (int(x+w/2), int(y+h/2)), 7, (255, 255, 255), -1)
+			if x+w/2 < 300:
+				cv2.putText(waterFrame, "motor forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+				motorOutput = '050050'
+			elif x+w/2 > 340:
+				cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+				motorOutput = '850850'
+			else:
+				if y+h/2 < 220:
+					cv2.putText(waterFrame, "stepper forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+					taskOutput = '902000'
+					motorOrTask = False
+				elif y+h/2 > 260:
+					cv2.putText(waterFrame, "stepper backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+					taskOutput = '901000'
+					motorOrTask = False
 				else:
-					if y+h/2 < 220:
-						cv2.putText(waterFrame, "stepper forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-						taskOutput = '902000'
-						motorOrTask = False
-					elif y+h/2 > 260:
-						cv2.putText(waterFrame, "stepper backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-						taskOutput = '901000'
-						motorOrTask = False
-					else:
-						cv2.putText(waterFrame, "water!!", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-						taskOutput = '900100'
-						motorOrTask = False
-						return True
+					cv2.putText(waterFrame, "water!!", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+					taskOutput = '900100'
+					motorOrTask = False
+					return True
 		cv2.rectangle(waterFrame, (300,220), (340, 260), (255, 255, 255), 3)
-	maskName[list(maskName)[variables['colorCode']]] = cv2.cvtColor(maskName[list(maskName)[variables['colorCode']]],cv2.COLOR_GRAY2BGR)
+	# maskName[list(maskName)[variables['colorCode']]] = cv2.cvtColor(maskName[list(maskName)[variables['colorCode']]],cv2.COLOR_GRAY2BGR)
+	cv2.imshow('result2', maskName[list(maskName)[variables['colorCode']]])
+	cv2.imshow('result', waterFrame)
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
@@ -296,26 +300,26 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 
 def potAndSign(currentState):
 	potDetect()
-		if signDetect():
-			if variables['signCounter'] > 3:		# counter to be tested
-				motorOrTask = False
-				state = currentState + 1
-				variables['signCounter'] = 0
-			else:
-				variables['signCounter'] += 1
-		else:
+	if signDetect():
+		if variables['signCounter'] > 3:		# counter to be tested
+			motorOrTask = False
+			state = currentState + 1
 			variables['signCounter'] = 0
+		else:
+			variables['signCounter'] += 1
+	else:
+		variables['signCounter'] = 0
 
 def potAndColor(currentState):
 	potDetect()
-		if colorDetect():
-			if variables['colorCounter'] > 3:
-				state = 1 + currentState
-				variables['colorCounter'] = 0
-			else:
-				variables['colorCounter'] += 1
-		else:
+	if colorDetect():
+		if variables['colorCounter'] > 3:
+			state = 1 + currentState
 			variables['colorCounter'] = 0
+		else:
+			variables['colorCounter'] += 1
+	else:
+		variables['colorCounter'] = 0
 
 def switch():
 	if state == 0:
@@ -343,33 +347,49 @@ def switch():
 	elif state == 9:
 		tubeDetect()
 
-frontCap = cv2.VideoCapture(0)
-sideCap = cv2.VideoCapture(1)
-waterCap = cv2.VideoCapture(2)
-
+# frontCap = cv2.VideoCapture(0)
+# sideCap = cv2.VideoCapture(0)
+waterCap = cv2.VideoCapture(0)
+variables['colorCode'] = 9
 while True:
-	ret1, frontFrame = frontCap.read()
-	ret2, sideFrame = sideCap.read()
-	ret3, waterFrame = waterCap.read()
-	if ret1 and ret2 and ret3:
-		frontFrame = cv2.resize(frontFrame, (640, 480))
-		sideFrame = cv2.resize(sideFrame, (640, 480))
-		waterFrame = cv2.resize(waterFrame, (640, 480))
-		signShow = frontFrame.copy()
-		maskAll()
-		switch()
- 
-		# if motorOrTask:
-		# 	ser.write(motorOutput.encode('utf-8'))
-		# else:
-		# 	ser.write(taskOutput.encode('utf-8'))
-		# 	motorOrTask = True
-	# while ser.in_waiting:
-	# 	state = int(ser.readline().decode())
-
+	# ret1, frontFrame = frontCap.read()
+	# ret2, sideFrame = sideCap.read()
+	
+	while ser.in_waiting:
+		serinput = int(ser.readline().decode('utf-8'))
+		print(serinput)
+		if serinput == 1:
+			state = 1
+		elif serinput == 2:
+			state = 3
+		elif serinput == 3:
+			state = 5
+		elif serinput == 4:
+			state = 9
+		ret3, waterFrame = waterCap.read()
+		if ret3: #and ret2 and ret3:
+			# frontFrame = cv2.resize(frontFrame, (640, 480))
+			# sideFrame = cv2.resize(sideFrame, (640, 480))
+			# waterFrame = cv2.resize(waterFrame, (640, 480))
+			# signShow = frontFrame.copy()
+			# maskAll()
+			# switch()
+			waterHsv=cv2.cvtColor(waterFrame,cv2.COLOR_BGR2HSV)
+			for i in range(7, 11):	#mask water four color
+				mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
+				maskName[list(maskName)[i]] = cv2.bitwise_and(waterHsv,waterHsv,mask=mask)
+				maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_HSV2BGR)
+				maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
+			waterDetect()
+			if motorOrTask:
+				ser.write(motorOutput.encode('utf-8'))
+				print(motorOutput)
+			else:
+				ser.write(taskOutput.encode('utf-8'))
+				motorOrTask = True
 	if cv2.waitKey(1)==ord("q"):
 		break
-frontCap.release()
-sideCap.release()
+# frontCap.release()
+# sideCap.release()
 waterCap.release()
 cv2.destroyAllWindows()
