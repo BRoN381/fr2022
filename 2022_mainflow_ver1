@@ -5,8 +5,8 @@ from time import sleep
 from roboflow import Roboflow
 
 ser = serial.Serial('COM5', 9600)
-motorOutput = "000000"
-taskOutput = "900000"
+motorOutput = "000000\n"
+taskOutput = "900000\n"
 motorOrTask = True 	#decide to send which output to arduino (true motor/ false task)
 variables = dict.fromkeys(['signCode', 'signCounter', 'colorCode', 'colorCounter'], 0)
 friutName = ['tomato', 'lemon', 'blue', 'avocado']
@@ -19,8 +19,8 @@ for i in range(640):
 # project = rf.workspace().project("fruit_detect_model_2.0")
 # model = project.version(1).model
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  3,177,164], [  0,  85,  67], [  0,121,121], [  0,158,192], [ 12,184, 91], [ 86,  0,243], [  0,  0,  0]]
-maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [ 11,255,255], [ 10,255,255], [ 31,255,192], [117,192,255], [179, 95,164]]
+maskLowwerBound = [[  3,177,164], [  0,  85,  67], [  0,121,121], [  0, 95,  255], [ 12,184, 91], [ 86,  0,243], [  0,  0,  0]]
+maskUpperBound  = [[ 57,255,234], [ 15, 255, 255], [ 11,255,255], [ 179,255,255], [ 31,255,192], [117,192,255], [179, 95,164]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask']) 
 state = 0
 
@@ -84,6 +84,8 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 	return False
 
 def potDetect():	#input: mask pot img/ output: (change global variable) motorOutput
+	global motorOutput
+	global taskOutput
 	turnratio = 0.3
 	firstcoor = -1
 	upbound = 120
@@ -154,6 +156,7 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 	cv2.imshow('cup', potMask)
 
 def colorDetect():	#input: four color mask img/ output: (change global variable) colorSign and return True
+	global queryfruit
 	for i in range(4):
 		maskName[list(maskName)[i+3]] = cv2.cvtColor(maskName[list(maskName)[i+3]],cv2.COLOR_HSV2BGR)
 		maskName[list(maskName)[i+3]] = cv2.cvtColor(maskName[list(maskName)[i+3]],cv2.COLOR_BGR2GRAY)
@@ -198,22 +201,22 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 			cv2.circle(waterFrame, (int(x+w/2), int(y+h/2)), 7, (255, 255, 255), -1)
 			if x+w/2 < 300:
 				cv2.putText(waterFrame, "motor forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-				motorOutput = '050050'
+				motorOutput = '050050\n'
 			elif x+w/2 > 340:
 				cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-				motorOutput = '850850'
+				motorOutput = '850850\n'
 			else:
 				if y+h/2 < 220:
 					cv2.putText(waterFrame, "stepper forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-					taskOutput = '902000'
+					taskOutput = '902000\n'
 					motorOrTask = False
 				elif y+h/2 > 260:
 					cv2.putText(waterFrame, "stepper backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-					taskOutput = '901000'
+					taskOutput = '901000\n'
 					motorOrTask = False
 				else:
 					cv2.putText(waterFrame, "water!!", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-					taskOutput = '900100'
+					taskOutput = '900100\n'
 					motorOrTask = False
 					return True
 		cv2.rectangle(waterFrame, (300,220), (340, 260), (255, 255, 255), 3)
@@ -223,6 +226,7 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
+	global motorOutput
 	turnratio = 0.1
 	upbound = 120
 	lowbound = 280
@@ -350,14 +354,13 @@ def switch():
 # frontCap = cv2.VideoCapture(0)
 # sideCap = cv2.VideoCapture(0)
 waterCap = cv2.VideoCapture(0)
-variables['colorCode'] = 9
+variables['colorCode'] = 7
+ser.write(motorOutput.encode('utf-8'))
 while True:
 	# ret1, frontFrame = frontCap.read()
 	# ret2, sideFrame = sideCap.read()
-	
 	while ser.in_waiting:
 		serinput = int(ser.readline().decode('utf-8'))
-		print(serinput)
 		if serinput == 1:
 			state = 1
 		elif serinput == 2:
@@ -381,15 +384,15 @@ while True:
 				maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_HSV2BGR)
 				maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
 			waterDetect()
-			if motorOrTask:
-				ser.write(motorOutput.encode('utf-8'))
-				print(motorOutput)
-			else:
-				ser.write(taskOutput.encode('utf-8'))
-				motorOrTask = True
+		if motorOrTask:
+			ser.write(motorOutput.encode('utf-8'))
+		else:
+			ser.write(taskOutput.encode('utf-8'))
+			motorOrTask = True
+		break
 	if cv2.waitKey(1)==ord("q"):
 		break
 # frontCap.release()
 # sideCap.release()
-waterCap.release()
+# waterCap.release()
 cv2.destroyAllWindows()
