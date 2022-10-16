@@ -2,21 +2,21 @@
 #include <LiquidCrystal.h>      //lcd
 #include <Wire.h>               //lcd
 #include <Unistep2.h>
-#include <Servo.h>              //servo
-#include <SK6812.h>             //color botton
+#include <Servo.h>   //servo
+#include <SK6812.h>  //color botton
 int rpwm, lpwm, sign, stepm, water, servom, color, perviousServom, runState, serOutput;
-
+902000
 const int outputPinLoc[10] = { A0, 2, 3, 4, 5, 6, 7, 8, 9, A1 };      //A0 servo, 2~5 main motor, 6~9 step motor, 44 water relay
 const int buttonPin[5] = { 34, 36, 38, 40, 42 };                      //34 state lock, 35~38 four states
 const int motorPin[4] = { 2, 3, 4, 5 };                               //left forward, left backward, right forward, right backward
 const int triangleTurnSpeed[6] = { 150, 150, 150, 150, 1700, 1700 };  //left forward, left backward, right forward, right backward, left turn time, right turn time
-const int squareTurnSpeed[4] = { 150, 150, 2200, 2000 };                    //left forward, right backward, turn time, forward time
+const int squareTurnSpeed[4] = { 150, 150, 2200, 2000 };              //left forward, right backward, turn time, forward time
 const int circleTurnSpeed[3] = { 150, 150, 6000 };                    //left forward, right backward, turn time
 const int clawAngle[2] = { 25, 100 };                                 //0 open, 1 close
 String colorArray[5] = { "none", "red", "yellow", "blue", "black" };
 
 SK6812 LED(3);
-Unistep2 myStepper(6,7,8,9, 4096, 900);
+Unistep2 myStepper(6, 7, 8, 9, 4096, 900);
 LiquidCrystal_I2C lcd(0x27, 16, 2);  //16,2為顯示器大小
 Servo clawServo;
 
@@ -25,12 +25,12 @@ void stopMotor();
 void moveMotor(int left, int right);  //main moving code
 void reverseMoveMotor(int left, int right);
 void readRunState();
-void readSign();                      //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
-void sign0();                         //move while checking claw code
-void triangleTurn(bool type);         //triangle sign, true for left, false for right
-void squareTurn();                    //90 degree turn
-void circleTurn();                    //180 degree turn
-void readStateButton();               //manual change state
+void readSign();               //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
+void sign0();                  //move while checking claw code
+void triangleTurn(bool type);  //triangle sign, true for left, false for right
+void squareTurn(bool type);    //true = left; false = right
+void circleTurn();             //180 degree turn
+void readStateButton();        //manual change state
 void printLcd(String str1, String str2);
 void claw();                         //0 open, 1 close
 void stepper();                      //0 stop, 1 forward, 2 backward
@@ -75,12 +75,15 @@ void reverseMoveMotor(int left, int right) {  //main moving code
 
 void triangleTurn(bool type) {  //triangle sign, true for left, false for right
   if (type) {                   //turn left
+    squareTurn(true);
+    moveMotor(128, 128);
+    delay(6500);
+    stopMotor();
     analogWrite(motorPin[1], triangleTurnSpeed[1]);
     analogWrite(motorPin[2], triangleTurnSpeed[2]);
     delay(triangleTurnSpeed[4]);
   } else {  //turn right
-    squareTurn();
-    stopMotor();
+    squareTurn(false);
     moveMotor(128, 128);
     delay(6500);
     stopMotor();
@@ -91,14 +94,22 @@ void triangleTurn(bool type) {  //triangle sign, true for left, false for right
   stopMotor();
 }
 
-void squareTurn() {  //90 degree turn
-  analogWrite(motorPin[0], squareTurnSpeed[0]);
-  analogWrite(motorPin[3], squareTurnSpeed[1]);
-  delay(squareTurnSpeed[2]);
+void squareTurn(bool type) {  //true = left; false = right
+  stopMotor();
+  if (type) {
+    analogWrite(motorPin[0], squareTurnSpeed[0]);
+    analogWrite(motorPin[3], squareTurnSpeed[1]);
+    delay(squareTurnSpeed[2]);
+  } else {
+    analogWrite(motorPin[1], squareTurnSpeed[0]);
+    analogWrite(motorPin[2], squareTurnSpeed[1]);
+    delay(squareTurnSpeed[2]);
+  }
   stopMotor();
 }
 
 void circleTurn() {  //180 degree turn
+  stopMotor();
   analogWrite(motorPin[1], circleTurnSpeed[0]);
   analogWrite(motorPin[2], circleTurnSpeed[1]);
   delay(circleTurnSpeed[2]);
@@ -124,14 +135,13 @@ void readStateButton() {
     buttonColorDisplay(stateInput + 4);
     lcd.clear();
     Serial.println(stateInput);
-  }
-  else {
+  } else {
     Serial.println(serOutput);
   }
 }
 
 void readSerial() {
-  while(true){
+  while (true) {
     if (Serial.available()) {
       char buffer[6];
       String str = Serial.readStringUntil('\n');
@@ -147,12 +157,11 @@ void readSerial() {
         serOutput = 999;
         // printLcd("state 1 /s" + String(sign), "st" + String(stepm) + "/w" + String(water) + "/sv" + String(servom) + "/c" + String(color));
       } else {
-        if (buffer[0] == '8'){
+        if (buffer[0] == '8') {
           runState = 3;
           lpwm = 50;
           rpwm = 50;
-        }
-        else{
+        } else {
           runState = 2;
           lpwm = (buffer[0] - '0') * 100 + (buffer[1] - '0') * 10 + (buffer[2] - '0');
           rpwm = (buffer[3] - '0') * 100 + (buffer[4] - '0') * 10 + (buffer[5] - '0');
@@ -169,8 +178,8 @@ void readSerial() {
   }
 }
 
-void readRunState(){
-  if(runState == 1) readSign();
+void readRunState() {
+  if (runState == 1) readSign();
   else if (runState == 2) moveMotor(lpwm, rpwm);
   else if (runState == 3) reverseMoveMotor(lpwm, rpwm);
 }
@@ -187,7 +196,7 @@ void readSign() {
       triangleTurn(false);
       break;
     case 3:
-      squareTurn();
+      squareTurn(false);
       break;
     default:
       circleTurn();
@@ -225,10 +234,10 @@ void stepper() {
 
 void watering() {  //0 off, 1 on
   if (water == 0) digitalWrite(outputPinLoc[9], HIGH);
-  else{
-    digitalWrite(outputPinLoc[9], LOW); 
+  else {
+    digitalWrite(outputPinLoc[9], LOW);
     delay(5000);
-  } 
+  }
 }
 
 void colorDisplay() {  //0 off, 1 red, 2 yellow, 3 blue, 4 black
