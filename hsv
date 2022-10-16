@@ -42,6 +42,7 @@ cap = cv2.VideoCapture(0)
 while(1):
     #read source image
     ret, frame = cap.read()
+    frame = cv2.flip(frame, -1)
     #convert sourece image to HSC color mode
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     #
@@ -50,13 +51,20 @@ while(1):
 
     #making mask for hsv range
     mask = cv2.inRange(hsv, hsv_low, hsv_high)
-    print (H_low, H_high, S_low, S_high, V_low, V_high)
+    numList = [H_low, S_low, V_low, H_high, S_high, V_high]
+    for i in range(6):
+        numList[i] = str(numList[i])
+        numList[i] = ' '*(3-len(numList[i]))+numList[i]
+    print (numList[0]+','+numList[1]+','+numList[2]+'\n'+numList[3]+','+numList[4]+','+numList[5])
+    print("----------------------------")
     #masking HSV value selected color becomes black
     res = cv2.bitwise_and(frame, frame, mask=mask)
 
     #show image
-    cv2.imshow('mask',mask)
-    cv2.imshow('res',res)
+    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    hor = np.vstack((res, mask))
+    hor = cv2.resize(hor, (427,640))
+    cv2.imshow('tracking',hor)
     
     #waitfor the user to press escape and break the while loop 
     if cv2.waitKey(1) == ord('q'):
