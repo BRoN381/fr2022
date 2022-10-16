@@ -11,6 +11,7 @@ variables = dict.fromkeys(['signCode', 'signCounter', 'colorCode', 'colorCounter
 friutName = ['tomato', 'lemon', 'blue', 'avocado']
 queryfruit = ''
 pixelcount = []
+Iterm = 0
 for i in range(640):
 	pixelcount.append(0)
 tubeQue = []
@@ -19,8 +20,8 @@ for i in range(70):
 
 
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  0,198,184], [  0,121, 67], [   0,125,  0], [  0,188,  0], [ 12,184, 91], [ 86,  0,243], [  0,  0,  0]]
-maskUpperBound  = [[ 14,255,255], [ 15,223,176], [ 179,255,255], [ 22,255,255], [ 31,255,192], [117,192,255], [179, 95,164]]
+maskLowwerBound = [[  0,166,158], [  0,117,  0], [   0,125,  0], [  0,188,  0], [ 12,184, 91], [ 86,  0,243], [  0,  0,  0]]
+maskUpperBound  = [[  8,255,255], [  9,223,186], [ 179,255,255], [ 22,255,255], [ 31,255,192], [117,192,255], [179, 95,164]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow']) 
 state = 0
 
@@ -48,7 +49,7 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 		# print(cnt)#輪廓點的數字,顯示在run的結果
 		area = cv2.contourArea(cnt)  # 輪廓面積
 		cv2.drawContours(maskName['signShow'], cnt, -1, (0, 255, 0), 3)
-		if area > 9500:  # 扣除雜訊
+		if area > 15000:  # 扣除雜訊
 			peri = cv2.arcLength(cnt, True)  # 輪廓邊長(輪廓,輪廓是否閉合)
 			vertices = cv2.approxPolyDP(cnt, peri * 0.02, True)  # 用多邊形近似輪廓(輪廓,近似值,輪廓是否閉合)會回傳多邊形頂點
 			corners = len(vertices)  # 有幾個頂點
@@ -72,29 +73,24 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 					cv2.putText(maskName['signShow'], "left", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 					variables['signCode'] = '1'
 					cv2.imshow('sign', maskName['signShow'])
-					cv2.imshow('mask', maskName['signMask'])	
 					return True
 				elif flag_x <= sec_x:
 					cv2.putText(maskName['signShow'], "right", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 					variables['signCode'] = '2'
 					cv2.imshow('sign', maskName['signShow'])
-					cv2.imshow('mask', maskName['signMask'])
 					return True
 			elif corners == 4: #是個正方形
 				cv2.putText(maskName['signShow'], "rectangle", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 				variables['signCode'] = '3'
 				cv2.imshow('sign', maskName['signShow'])
-				cv2.imshow('mask', maskName['signMask'])		
 				return True
 			elif corners == 8:  # 是個正方形
 				cv2.putText(maskName['signShow'], "circle", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 				variables['signCode'] = '4'
 				cv2.imshow('sign', maskName['signShow'])
-				cv2.imshow('mask', maskName['signMask'])
 				return True
 	cv2.putText(maskName['signShow'], "None", (10, 480-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 	cv2.imshow('sign', maskName['signShow'])
-	cv2.imshow('mask', maskName['signMask'])
 	return False
 
 def potDetect():	#input: mask pot img/ output: (change global variable) motorOutput
@@ -240,101 +236,107 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
-	global motorOutput
-	global tubeQue
-	turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.8, 0, 0, 0, 0
-	upbound = 360
-	lowbound = 380
-	boundary = [0, 0, 0, 0]
-	num = np.uint8(0)
-	for i in range(0, 290):
-		#chop the image
-		if boundary[0] == 0:
-			if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
-				if luCounter > 2:
-					boundary[0] = i
-					cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
-				else :
-					luCounter += 1
-			else:
-				luCounter = 0
-		if boundary[1] == 0:
-			if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
-				if llCounter > 2:
-					boundary[1] = i
-					cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
-				else :
-					llCounter += 1
-			else:
-				llCounter = 0
-	for i in range(350, 640):
-		num = np.uint8(0)
-		#chop the image
-		if boundary[2] == 0:
-			if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
-				if ruCounter > 2:
-					boundary[2] = i
-					cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
-				else :
-					ruCounter += 1
-			else:
-				ruCounter = 0
-		if boundary[3] == 0:
-			if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
-				if rlCounter > 2:
-					boundary[3] = i
-					cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
-				else :
-					rlCounter += 1
-			else:
-				rlCounter = 0
-	if (boundary[0] == 0 and boundary[1] != 0):
-		if boundary[1] > 160:
-			boundary[0] = 320
-	if (boundary[1] == 0 and boundary[0] != 0):
-		if boundary[0] > 160:
-			boundary[1] = 320
-	if (boundary[2] == 0 and boundary[3] != 0):
-		if boundary[3] > 480:
-			boundary[2] = 640
-		else:
-			boundary[2] = 320
-	if (boundary[3] == 0 and boundary[2] != 0):
-		if boundary[2] > 480:
-			boundary[3] = 640
-		else:
-			boundary[3] = 320
-		
-	leftdiff = abs(boundary[1] - boundary[0])
-	rightdiff = abs(boundary[3] - boundary[2])
-	moveratio = (leftdiff-rightdiff)*turnratio
-	cv2.line(maskName['tubeShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
-	cv2.line(maskName['tubeShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
-	if abs(leftdiff-rightdiff) < 20:
-		cv2.putText(maskName['tubeShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	elif leftdiff > rightdiff:
-		cv2.putText(maskName['tubeShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	else:
-		cv2.putText(maskName['tubeShow'], "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	left = 128 + moveratio 
-	right = 128 - moveratio
-	left_str = str(int(left))
-	right_str = str(int(right))
-	if right < 100:
-		right_str = '0' + right_str
-	if left < 100:
-		left_str = '0' + left_str
-	now = left_str + right_str +'\n'
-	tubeQue.append(now)
-	motorOutput = tubeQue.pop(1)
-	cv2.imshow('tube', maskName['tubeShow'])
-	print('boundary:', boundary)
-	print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
-	print('now',now)
-	print('motorOutput', motorOutput)
+	def tubeDetect(): #input: mask tube img/ output: (change global variable) motorOutput
+ global motorOutput
+ global tubeQue
+ global Iterm
+ Iratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.4, 0.8, 0, 0, 0, 0
+ upbound = 360
+ lowbound = 380
+ boundary = [0, 0, 0, 0]
+ num = np.uint8(0)
+ for i in range(0, 290):
+  #chop the image
+  if boundary[0] == 0:
+   if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
+    if luCounter > 2:
+     boundary[0] = i
+     cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
+    else :
+     luCounter += 1
+   else:
+    luCounter = 0
+  if boundary[1] == 0:
+   if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
+    if llCounter > 2:
+     boundary[1] = i
+     cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
+    else :
+     llCounter += 1
+   else:
+    llCounter = 0
+ for i in range(350, 640):
+  num = np.uint8(0)
+  #chop the image
+  if boundary[2] == 0:
+   if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
+    if ruCounter > 2:
+     boundary[2] = i
+     cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
+    else :
+     ruCounter += 1
+   else:
+    ruCounter = 0
+  if boundary[3] == 0:
+   if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
+    if rlCounter > 2:
+     boundary[3] = i
+     cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
+    else :
+     rlCounter += 1
+   else:
+    rlCounter = 0
+ if (boundary[0] == 0 and boundary[1] != 0):
+  if boundary[1] > 160:
+   boundary[0] = 320
+ if (boundary[1] == 0 and boundary[0] != 0):
+  if boundary[0] > 160:
+   boundary[1] = 320
+ if (boundary[2] == 0 and boundary[3] != 0):
+  if boundary[3] > 480:
+   boundary[2] = 640
+  else:
+   boundary[2] = 320
+ if (boundary[3] == 0 and boundary[2] != 0):
+  if boundary[2] > 480:
+   boundary[3] = 640
+  else:
+   boundary[3] = 320
+  
+ leftdiff = abs(boundary[1] - boundary[0])
+ rightdiff = abs(boundary[3] - boundary[2])
+ timediff = 0.1
+ Iterm += (leftdiff-rightdiff) * timediff
+ moveratio = (leftdiff-rightdiff)*turnratio + Iterm *  Iratio
+ cv2.line(maskName['tubeShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
+ cv2.line(maskName['tubeShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
+ if abs(leftdiff-rightdiff) < 20:
+  cv2.putText(maskName['tubeShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+ elif leftdiff > rightdiff:
+  cv2.putText(maskName['tubeShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+ else:
+  cv2.putText(maskName['tubeShow'], "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+ left = 128 + moveratio 
+ right = 128 - moveratio
+ left_str = str(int(left))
+ right_str = str(int(right))
+ if right < 100:
+  right_str = '0' + right_str
+ if left < 100:
+  left_str = '0' + left_str
+ now = left_str + right_str +'\n'
+ tubeQue.append(now)
+ motorOutput = tubeQue.pop(1)
+ cv2.imshow('tube', maskName['tubeShow'])
+ print('boundary:', boundary)
+ print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
+ print('now',now)
+ print('motorOutput', motorOutput)
 
 def potAndSign(currentState):
 	global state
+	global taskOutput
+	global motorOrTask
 	potDetect()
 	if signDetect():
 		# cv2.imshow('sign', maskName['signShow'])
@@ -394,17 +396,36 @@ frontCap = cv2.VideoCapture(0)
 # sideCap = cv2.VideoCapture(1)
 # waterCap = cv2.VideoCapture(2)
 ser.write(motorOutput.encode('utf-8'))
+# serdiff = True
 while True:
 	while ser.in_waiting:
+
 		serinput = int(ser.readline().decode('utf-8'))
-		if serinput == 1:
-			state = 1
-		elif serinput == 2:
-			state = 3
-		elif serinput == 3:
-			state = 5
-		elif serinput == 4:
-			state = 9
+		print('serinput', serinput)
+		if motorOrTask == False: # wait until arduino finish task 
+			if serinput == 999:
+				motorOrTask = True
+			else:
+				break
+		# if serdiff:
+		# 	if serinput == int(motorOutput[0:3]):
+		# 		serdiff = False
+		# 	else:
+		# 		ser.write(motorOutput.encode('utf-8'))
+		# 		print('there is serdiff')
+		# 		break
+		# if serinput == 1:
+		# 	state = 1
+		# 	print('change state to 1')
+		# elif serinput == 2:
+		# 	state = 3
+		# 	print('change state to 3')
+		# elif serinput == 3:
+		# 	state = 5
+		# 	print('change state to 5')
+		# elif serinput == 4:
+		# 	state = 9
+		# 	print('change state to 9')
 		ret1, frontFrame = frontCap.read()
 		# ret2, sideFrame = sideCap.read()
 		# ret3, waterFrame = waterCap.read()
@@ -417,13 +438,17 @@ while True:
 			maskName['potShow'] = frontFrame.copy()
 			maskName['tubeShow'] = frontFrame.copy()
 			maskAll()
-			# switch()
-			tubeDetect()
+			switch()
+			# tubeDetect()
+			# signDetect()
 		if motorOrTask:
 			ser.write(motorOutput.encode('utf-8'))
+			print('----ser motor----')
 		else:
 			ser.write(taskOutput.encode('utf-8'))
-			motorOrTask = True
+			print('----ser task----')
+			print(taskOutput)
+			# motorOrTask = True
 		if cv2.waitKey(1)==ord("q"):
 			break
 		break
