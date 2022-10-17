@@ -4,8 +4,8 @@
 #include <Unistep2.h>
 #include <Servo.h>   //servo
 #include <SK6812.h>  //color botton
+#include <Ultrasonic.h>
 int rpwm, lpwm, sign, stepm, water, servom, color, perviousServom, runState, serOutput;
-902000
 const int outputPinLoc[10] = { A0, 2, 3, 4, 5, 6, 7, 8, 9, A1 };      //A0 servo, 2~5 main motor, 6~9 step motor, 44 water relay
 const int buttonPin[5] = { 34, 36, 38, 40, 42 };                      //34 state lock, 35~38 four states
 const int motorPin[4] = { 2, 3, 4, 5 };                               //left forward, left backward, right forward, right backward
@@ -13,12 +13,14 @@ const int triangleTurnSpeed[6] = { 150, 150, 150, 150, 1700, 1700 };  //left for
 const int squareTurnSpeed[4] = { 150, 150, 2200, 2000 };              //left forward, right backward, turn time, forward time
 const int circleTurnSpeed[3] = { 150, 150, 6000 };                    //left forward, right backward, turn time
 const int clawAngle[2] = { 25, 100 };                                 //0 open, 1 close
+const double grab_distance = 2.5;
 String colorArray[5] = { "none", "red", "yellow", "blue", "black" };
 
 SK6812 LED(3);
 Unistep2 myStepper(6, 7, 8, 9, 4096, 900);
 LiquidCrystal_I2C lcd(0x27, 16, 2);  //16,2為顯示器大小
 Servo clawServo;
+Ultrasonic ultrasonic(A3, A2);  //ultrasonic(trig, echo)
 
 void readSerial();
 void stopMotor();
@@ -32,12 +34,13 @@ void squareTurn(bool type);    //true = left; false = right
 void circleTurn();             //180 degree turn
 void readStateButton();        //manual change state
 void printLcd(String str1, String str2);
-void claw();                         //0 open, 1 close
+void grabFruit();                    //0 off, 1 grab
 void stepper();                      //0 stop, 1 forward, 2 backward
 void watering();                     //0 off, 1 on
 void colorDisplay();                 //0 off, 1 red, 2 yellow, 3 blue, 4 black
 void buttonColorDisplay(int state);  //0 all white, 1~4 button color, 5 rainbow
 void clearLED();
+
 
 void setup() {
   for (int i = 0; i < 10; i++) pinMode(outputPinLoc[i], OUTPUT);
@@ -66,9 +69,13 @@ void stopMotor() {
 void moveMotor(int left, int right) {  //main moving code
   analogWrite(motorPin[0], left);
   analogWrite(motorPin[2], right);
+  analogWrite(motorPin[1], 0);
+  analogWrite(motorPin[3], 0);
 }
 
 void reverseMoveMotor(int left, int right) {  //main moving code
+  analogWrite(motorPin[0], 0);
+  analogWrite(motorPin[2], 0);
   analogWrite(motorPin[1], left);
   analogWrite(motorPin[3], right);
 }
@@ -205,7 +212,7 @@ void readSign() {
 }
 
 void sign0() {
-  claw();
+  grabFruit();
   stepper();
   watering();
   colorDisplay();
@@ -219,10 +226,6 @@ void printLcd(String str1, String str2) {
   lcd.print(str2);
 }
 
-void claw() {
-  clawServo.write(clawAngle[servom]);
-}
-
 void stepper() {
   if (stepm == 1) {
     myStepper.move(100);
@@ -232,11 +235,32 @@ void stepper() {
   myStepper.run();
 }
 
+void grabFruit() {
+  if (servom) {
+    int distance_now = ultrasonic.read();
+    int actual_distance = 0;
+    while (distance_now > grab_distance) {
+      myStepper.move(100);
+      actual_distance += 100;
+    }
+    clawServo.write(clawAngle[1]);
+    myStepper.move(-1 * actual_distance);
+    stopMotor();
+    moveMotor(50, 50);
+    delay(3000);
+    stopMotor();
+    myStepper.move(actual_distance);
+    clawServo.write(clawAngle[0]);
+    myStepper.move(-1 * actual_distance);
+  }
+}
+
 void watering() {  //0 off, 1 on
   if (water == 0) digitalWrite(outputPinLoc[9], HIGH);
   else {
     digitalWrite(outputPinLoc[9], LOW);
     delay(5000);
+    digitalWrite(outputPinLoc[9], HIGH);
   }
 }
 
