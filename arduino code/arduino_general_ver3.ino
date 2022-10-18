@@ -1,11 +1,12 @@
 #include <LiquidCrystal_I2C.h>  //lcd
 #include <LiquidCrystal.h>      //lcd
 #include <Wire.h>               //lcd
+#include <Stepper.h>
 #include <Unistep2.h>
 #include <Servo.h>   //servo
 #include <SK6812.h>  //color botton
 #include <Ultrasonic.h>
-int rpwm, lpwm, sign, stepm, water, servom, color, perviousServom, runState, serOutput;
+int rpwm, lpwm, sign, stepm, water, servom, color, perviousServom, runState, serOutput, stepperMove;
 const int outputPinLoc[10] = { A0, 2, 3, 4, 5, 6, 7, 8, 9, A1 };      //A0 servo, 2~5 main motor, 6~9 step motor, 44 water relay
 const int buttonPin[5] = { 34, 36, 38, 40, 42 };                      //34 state lock, 35~38 four states
 const int motorPin[4] = { 2, 3, 4, 5 };                               //left forward, left backward, right forward, right backward
@@ -13,14 +14,16 @@ const int triangleTurnSpeed[6] = { 150, 150, 150, 150, 1700, 1700 };  //left for
 const int squareTurnSpeed[4] = { 150, 150, 2200, 2000 };              //left forward, right backward, turn time, forward time
 const int circleTurnSpeed[3] = { 150, 150, 6000 };                    //left forward, right backward, turn time
 const int clawAngle[2] = { 25, 100 };                                 //0 open, 1 close
-const double grab_distance = 2.5;
+const int grab_distance = 3;
 String colorArray[5] = { "none", "red", "yellow", "blue", "black" };
 
 SK6812 LED(3);
-Unistep2 myStepper(6, 7, 8, 9, 4096, 900);
+Stepper myStepper(2048, 6, 8, 7, 9);
+// Unistep2 myStepper(6, 7, 8, 9, 4096, 900);
 LiquidCrystal_I2C lcd(0x27, 16, 2);  //16,2為顯示器大小
 Servo clawServo;
 Ultrasonic ultrasonic(A3, A2);  //ultrasonic(trig, echo)
+Ultrasonic bottomSonic(A5, A4); 
 
 void readSerial();
 void stopMotor();
@@ -53,13 +56,111 @@ void setup() {
   clearLED();
   clawServo.attach(A0);
   clawServo.write(clawAngle[0]);
-  myStepper.run();
+  // myStepper.run();
+  myStepper.setSpeed(15);
+
 }
 
 void loop() {
   readStateButton();
   readSerial();
   readRunState();
+}
+
+void readStateButton() {
+  int stateInput = 0;
+  if (digitalRead(buttonPin[0]) == LOW) {
+    stopMotor();
+    printLcd("STATE UNLOCK", "PLZ INPUT STATE");
+    buttonColorDisplay(0);
+    while (digitalRead(buttonPin[0]) == LOW) {  //while unlock
+      for (int i = 1; i < 5; i++) {
+        if (digitalRead(buttonPin[i]) == LOW) {
+          printLcd("INPUT STATE " + (String)i, "COMFIRM?");
+          buttonColorDisplay(i);
+          stateInput = i;
+        }
+      }
+    }
+    printLcd("    STATE " + (String)stateInput, "===ACTIVATED===");
+    buttonColorDisplay(stateInput + 4);
+    lcd.clear();
+    Serial.println(stateInput);
+  } else {
+    Serial.println(serOutput);
+  }
+}
+
+void readSerial() {
+  while (true) {
+    if (Serial.available()) {
+      char buffer[6];
+      String str = Serial.readStringUntil('\n');
+      str.toCharArray(buffer, 7);
+      if (buffer[0] == '9') {
+        printLcd("task", str);
+        runState = 1;
+        sign = buffer[1] - '0';
+        stepm = buffer[2] - '0';
+        water = buffer[3] - '0';
+        servom = buffer[4] - '0';
+        color = buffer[5] - '0';
+        serOutput = 999;
+        // printLcd("state 1 /s" + String(sign), "st" + String(stepm) + "/w" + String(water) + "/sv" + String(servom) + "/c" + String(color));
+      } else {
+        if (buffer[0] == '8') {
+          runState = 3;
+          lpwm = 30;
+          rpwm = 30;
+        } else {
+          runState = 2;
+          lpwm = (buffer[0] - '0') * 100 + (buffer[1] - '0') * 10 + (buffer[2] - '0');
+          rpwm = (buffer[3] - '0') * 100 + (buffer[4] - '0') * 10 + (buffer[5] - '0');
+        }
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print(lpwm);
+        lcd.setCursor(0, 1);
+        lcd.print(rpwm);
+        serOutput = lpwm;
+      }
+      break;
+    }
+  }
+}
+
+void readRunState() {
+  if (runState == 1) readSign();
+  else if (runState == 2) moveMotor(lpwm, rpwm);
+  else if (runState == 3) reverseMoveMotor(lpwm, rpwm);
+}
+
+void readSign() {
+  switch (sign) {  //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
+    case 0:
+      sign0();
+      break;
+    case 1:
+      triangleTurn(true);
+      break;
+    case 2:
+      triangleTurn(false);
+      break;
+    case 3:
+      squareTurn(false);
+      break;
+    default:
+      circleTurn();
+      break;
+  }
+}
+
+void sign0() {
+  stopMotor();
+  grabFruit();
+  stepper();
+  watering();
+  colorDisplay();
 }
 
 void stopMotor() {
@@ -123,101 +224,6 @@ void circleTurn() {  //180 degree turn
   stopMotor();
 }
 
-void readStateButton() {
-  int stateInput = 0;
-  if (digitalRead(buttonPin[0]) == LOW) {
-    stopMotor();
-    printLcd("STATE UNLOCK", "PLZ INPUT STATE");
-    buttonColorDisplay(0);
-    while (digitalRead(buttonPin[0]) == LOW) {  //while unlock
-      for (int i = 1; i < 5; i++) {
-        if (digitalRead(buttonPin[i]) == LOW) {
-          printLcd("INPUT STATE " + (String)i, "COMFIRM?");
-          buttonColorDisplay(i);
-          stateInput = i;
-        }
-      }
-    }
-    printLcd("    STATE " + (String)stateInput, "===ACTIVATED===");
-    buttonColorDisplay(stateInput + 4);
-    lcd.clear();
-    Serial.println(stateInput);
-  } else {
-    Serial.println(serOutput);
-  }
-}
-
-void readSerial() {
-  while (true) {
-    if (Serial.available()) {
-      char buffer[6];
-      String str = Serial.readStringUntil('\n');
-      str.toCharArray(buffer, 7);
-      if (buffer[0] == '9') {
-        printLcd("task", str);
-        runState = 1;
-        sign = buffer[1] - '0';
-        stepm = buffer[2] - '0';
-        water = buffer[3] - '0';
-        servom = buffer[4] - '0';
-        color = buffer[5] - '0';
-        serOutput = 999;
-        // printLcd("state 1 /s" + String(sign), "st" + String(stepm) + "/w" + String(water) + "/sv" + String(servom) + "/c" + String(color));
-      } else {
-        if (buffer[0] == '8') {
-          runState = 3;
-          lpwm = 50;
-          rpwm = 50;
-        } else {
-          runState = 2;
-          lpwm = (buffer[0] - '0') * 100 + (buffer[1] - '0') * 10 + (buffer[2] - '0');
-          rpwm = (buffer[3] - '0') * 100 + (buffer[4] - '0') * 10 + (buffer[5] - '0');
-        }
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print(lpwm);
-        lcd.setCursor(0, 1);
-        lcd.print(rpwm);
-        serOutput = lpwm;
-      }
-      break;
-    }
-  }
-}
-
-void readRunState() {
-  if (runState == 1) readSign();
-  else if (runState == 2) moveMotor(lpwm, rpwm);
-  else if (runState == 3) reverseMoveMotor(lpwm, rpwm);
-}
-
-void readSign() {
-  switch (sign) {  //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
-    case 0:
-      sign0();
-      break;
-    case 1:
-      triangleTurn(true);
-      break;
-    case 2:
-      triangleTurn(false);
-      break;
-    case 3:
-      squareTurn(false);
-      break;
-    default:
-      circleTurn();
-      break;
-  }
-}
-
-void sign0() {
-  grabFruit();
-  stepper();
-  watering();
-  colorDisplay();
-}
-
 void printLcd(String str1, String str2) {
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -228,50 +234,67 @@ void printLcd(String str1, String str2) {
 
 void stepper() {
   if (stepm == 1) {
-    myStepper.move(100);
+    myStepper.step(100);
+    stepperMove += 1;
   } else if (stepm == 2) {
-    myStepper.move(-100);
+    myStepper.step(-100);
+    stepperMove -= 1;
   }
-  myStepper.run();
 }
 
 void grabFruit() {
   if (servom) {
-    int distance_now = ultrasonic.read();
-    int actual_distance = 0;
-    while (distance_now > grab_distance) {
-      myStepper.move(100);
-      actual_distance += 100;
+    while (ultrasonic.read() > grab_distance) {
+      myStepper.step(100);
+      stepperMove ++;
     }
+    printLcd("task", "grab finish");
     clawServo.write(clawAngle[1]);
-    myStepper.move(-1 * actual_distance);
-    stopMotor();
+    myStepper.step(-100 * stepperMove);
     moveMotor(50, 50);
     delay(3000);
     stopMotor();
-    myStepper.move(actual_distance);
+    myStepper.step(100 * stepperMove);
     clawServo.write(clawAngle[0]);
-    myStepper.move(-1 * actual_distance);
+    myStepper.step(-100 * stepperMove);
   }
 }
 
 void watering() {  //0 off, 1 on
   if (water == 0) digitalWrite(outputPinLoc[9], HIGH);
   else {
-    digitalWrite(outputPinLoc[9], LOW);
-    delay(5000);
+    digitalWrite(outputPinLoc[9], LOW); 
+    delay(50000);
     digitalWrite(outputPinLoc[9], HIGH);
+    myStepper.step(-100*stepperMove);
+    stepperMove = 0;
+    delay(1000);
+    circleTurn();
   }
 }
 
 void colorDisplay() {  //0 off, 1 red, 2 yellow, 3 blue, 4 black
   if (color != 0) {
-    lcd.setCursor(0, 0);
-    lcd.print("The color is:");
-    lcd.setCursor(0, 1);
-    lcd.print(colorArray[color]);
-    delay(5000);
-    lcd.clear();
+    if (color < 4){ //fruit
+      printLcd("The color is:", colorArray[color]);
+      delay(5000);
+      lcd.clear();
+      moveMotor(128, 128);
+      delay(1500);
+        //tba
+      while(bottomSonic.read()>20){
+        myStepper.step(-100);
+        stepperMove--;
+      } 
+    }else{  //water
+      printLcd("The color is:", colorArray[color-4]);
+      delay(5000);
+      lcd.clear();
+      moveMotor(100, 100);
+      delay(3000);  // tba
+      myStepper.step(10000);  //tba
+    }
+    
   }
 }
 
