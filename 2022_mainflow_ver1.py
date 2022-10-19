@@ -254,6 +254,7 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
+	def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
 	global motorOutput
 	global tubeQue
 	global Iterm
@@ -263,7 +264,7 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 	lowbound = 380
 	midpoint = 240
 	setpoint = 100
-	boundary = [0, 0, 0, 0]
+	boundary = [0, 0, 0]
 	num = np.uint8(0)
 	for i in range(0, 480):
 		#chop the image
@@ -285,123 +286,25 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 					llCounter += 1
 			else:
 				llCounter = 0
-		# if boundary[2] == 0:
-		# 	if (maskName['tubeMask'][midpoint][i][0] != num or maskName['tubeMask'][midpoint][i][1] != num or maskName['tubeMask'][midpoint][i][2] != num):
-		# 		if ruCounter > 2:
-		# 			boundary[1] = i
-		# 			cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
-		# 		else :
-		# 			ruCounter += 1
-		# 	else:
-		# 		ruCounter = 0
+		if boundary[2] == 0:
+			if (maskName['tubeMask'][midpoint][i][0] != num or maskName['tubeMask'][midpoint][i][1] != num or maskName['tubeMask'][midpoint][i][2] != num):
+				if ruCounter > 2:
+					boundary[2] = i
+					cv2.circle(maskName['tubeShow'], (i, midpoint), 5, (255, 204, 0), -1)
+				else :
+					ruCounter += 1
+			else:
+				ruCounter = 0
 
 		
+	sideratio = 0.4
 	leftdiff = boundary[0]
 	rightdiff = boundary[1]
-	middiff = boundary[2]
-	# moveratio = (leftdiff-rightdiff) * turnratio + (middiff-setpoint) * sideratio
-	moveratio = (leftdiff-rightdiff) * turnratio
+	middiff = boundary[2] - setpoint
+	moveratio = (leftdiff-rightdiff) * turnratio - middiff * sideratio
 
 	cv2.line(maskName['tubeShow'], (setpoint, 0), (setpoint, 480), (0, 255, 0), 1)
 
-	# global motorOutput
-	# global tubeQue
-	# global Ilist
-	# global Iterm
-	# global prevtime
-	# Iratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.2, 0.2, 0, 0, 0, 0
-	# timediff = 0.03
-	# upbound = 320
-	# lowbound = 380
-	# boundary = [0, 0, 0, 0]
-	# num = np.uint8(0)
-	# for i in range(0, 290):
-	# 	#chop the image
-	# 	if boundary[0] == 0:
-	# 		if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
-	# 			if luCounter > 2:
-	# 				boundary[0] = i
-	# 				cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
-	# 			else :
-	# 				luCounter += 1
-	# 		else:
-	# 			luCounter = 0
-	# 	if boundary[1] == 0:
-	# 		if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
-	# 			if llCounter > 2:
-	# 				boundary[1] = i
-	# 				cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
-	# 			else :
-	# 				llCounter += 1
-	# 		else:
-	# 			llCounter = 0
-	# for i in range(350, 640):
-	# 	num = np.uint8(0)
-	# 	#chop the image
-	# 	if boundary[2] == 0:
-	# 		if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
-	# 			if ruCounter > 2:
-	# 				boundary[2] = i
-	# 				cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
-	# 			else :
-	# 				ruCounter += 1
-	# 		else:
-	# 			ruCounter = 0
-	# 	if boundary[3] == 0:
-	# 		if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
-	# 			if rlCounter > 2:
-	# 				boundary[3] = i
-	# 				cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
-	# 			else :
-	# 				rlCounter += 1
-	# 		else:
-	# 			rlCounter = 0
-	# if (boundary[0] == 0 and boundary[1] != 0):
-	# 	if boundary[1] > 160:
-	# 		boundary[0] = 320
-	# if (boundary[1] == 0 and boundary[0] != 0):
-	# 	if boundary[0] > 160:
-	# 		boundary[1] = 320
-	# if (boundary[2] == 0 and boundary[3] != 0):
-	# 	if boundary[3] > 480:
-	# 		boundary[2] = 640
-	# 	else:
-	# 		boundary[2] = 320
-	# if (boundary[3] == 0 and boundary[2] != 0):
-	# 	if boundary[2] > 480:
-	# 		boundary[3] = 640
-	# 	else:
-	# 		boundary[3] = 320
-		
-	# leftdiff = abs(boundary[1] - boundary[0])
-	# rightdiff = abs(boundary[3] - boundary[2])
-	# Iterm += (leftdiff-rightdiff) * timediff
-	# if time.time() - prevtime < 2:
-	# 	Ilist.append((leftdiff-rightdiff) * timediff)
-	# else:
-	# 	Ilist.append((leftdiff-rightdiff) * timediff)
-	# 	k = Ilist.pop(0)
-	# 	Iterm -= k
-
-	# if(Iterm > 300):
-	# 	Iterm = 500
-	# if(Iterm < -300):
-	# 	Iterm = -500
-	# print('Iterm: ' , Iterm)
-	# print('Pterm: ' , (leftdiff - rightdiff))
-	# print('I: ' , Iterm * Iratio)
-	# print('P: ' , ((leftdiff - rightdiff) * turnratio))
-	# moveratio = (leftdiff-rightdiff)*turnratio + Iterm *  Iratio
-	# cv2.line(maskName['tubeShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
-	# cv2.line(maskName['tubeShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
-
-
-	if abs(leftdiff-rightdiff) < 20:
-		cv2.putText(maskName['tubeShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	elif leftdiff > rightdiff:
-		cv2.putText(maskName['tubeShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	else:
-		cv2.putText(maskName['tubeShow'], "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
 	left = 128 + moveratio 
 	right = 128 - moveratio
 	left_str = str(int(left))
