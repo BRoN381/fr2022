@@ -3,7 +3,9 @@ import numpy as np
 import serial
 import time
 
-ser = serial.Serial('COM17', 9600)
+# ser = serial.Serial('COM17', 9600)
+ser = serial.Serial('/dev/ttyUSB0', 9600)
+
 motorOutput = "000000\n"
 taskOutput = "900000\n"
 motorOrTask = True 	#decide to send which output to arduino (true motor/ false task)
@@ -19,7 +21,7 @@ for i in range(640):
 	pixelcount.append(0)
 
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  0,128,198], [  0,117,  0], [  0, 42,136], [  0,174,146], [  0,138,190], [ 74, 85,  0], [ 31,  0, 14]]
+maskLowwerBound = [[  0,128,198], [  0,117,  0], [ 51,115,170], [  0,174,146], [  0,138,190], [ 74, 85,  0], [ 31,  0, 14]]
 maskUpperBound  = [[ 19,253,255], [  9,223,186], [179,255,255], [179,255,255], [ 41,255,255], [108,255,255], [ 71,255,111]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
 state = 0
@@ -27,8 +29,21 @@ preState = 0
 
 def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
 	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
-	sideHsv=cv2.cvtColor(sideFrame,cv2.COLOR_BGR2HSV)
 	waterHsv=cv2.cvtColor(waterFrame,cv2.COLOR_BGR2HSV)
+	for i in range(2):	#mask sign, pot, tube
+		mask = cv2.inRange(frontHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
+		maskName[list(maskName)[i]] = cv2.bitwise_and(frontFrame,frontFrame,mask=mask)
+	maskName['signMask'] = cv2.cvtColor(maskName['signMask'],cv2.COLOR_BGR2GRAY)
+	for i in range(7, 11):	#mask water four color
+		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
+		maskName[list(maskName)[i]] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
+		maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
+		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[2]),np.array(maskUpperBound[2]))
+		maskName['tubeMask'] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
+
+def maskSide():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
+	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
+	sideHsv=cv2.cvtColor(sideFrame,cv2.COLOR_BGR2HSV)
 	for i in range(3):	#mask sign, pot, tube
 		mask = cv2.inRange(frontHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
 		maskName[list(maskName)[i]] = cv2.bitwise_and(frontFrame,frontFrame,mask=mask)
@@ -36,14 +51,11 @@ def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign
 	for i in range(3, 7):	#mask side four color
 		mask = cv2.inRange(sideHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
 		maskName[list(maskName)[i]] = cv2.bitwise_and(sideHsv,sideHsv,mask=mask)
-	for i in range(7, 11):	#mask water four color
-		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
-		maskName[list(maskName)[i]] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
-		maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
 
 def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: None, 1: left tri, 2: right tri, 3: square, 4: circle) and return True
 	contours, hierarchy = cv2.findContours(maskName['signMask'], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  
 	maskName['signShow'] = frontFrame.copy()
+	global motorOutput
 	# x,y,w,h=-1,-1,-1,-1
 	for cnt in contours:
 		area = cv2.contourArea(cnt)  
@@ -88,6 +100,8 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 				variables['signCode'] = '4'
 				cv2.imshow('sign', maskName['signShow'])
 				return True
+		elif area > 7000:
+			motorOutput = '128128\n'
 	cv2.putText(maskName['signShow'], "None", (10, 480-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 	cv2.imshow('sign', maskName['signShow'])
 	return False
@@ -328,6 +342,7 @@ def potAndSign(currentState):
 			motorOrTask = False
 			taskOutput = '9'+variables['signCode']+'0000\n'
 			state = currentState + 1
+			preState = currentState
 			print('change state to', state)
 			variables['signCounter'] = 0
 		else:
@@ -342,6 +357,7 @@ def potAndColor(currentState):
 	if colorDetect():
 		if variables['colorCounter'] > 3:
 			state = 1 + currentState
+			preState = currentState
 			variables['colorCounter'] = 0
 			taskOutput = '90000'+str(variables['colorCode']+1)+'\n'
 			motorOrTask = False
@@ -359,6 +375,7 @@ def switch():
 	elif state == 2:
 		if fruitDetect():
 			state = 3
+			preState = 2
 	elif state == 3:
 		potAndSign(state)
 	elif state == 4:
@@ -368,6 +385,7 @@ def switch():
 	elif state == 6:
 		if waterDetect():
 			state = 7
+			preState = 6
 	elif state == 7:
 		potAndSign(state)
 	elif state == 8:
@@ -378,7 +396,7 @@ def switch():
 frontCap = cv2.VideoCapture(0)
 waterCap = cv2.VideoCapture(2)
 ser.write(motorOutput.encode('utf-8'))
-
+state = 8
 while True:
 	while ser.in_waiting:
 		serinput = int(ser.readline().decode('utf-8'))
@@ -392,15 +410,76 @@ while True:
 		if serinput == 1:
 			state = 1
 			print('change state to 1')
+			# -------------
+
+			if preState != 5:
+				preState = state
+				waterCap.release()
+				sideCap = cv2.VideoCapture(1)
+			ret1, frontFrame = frontCap.read()
+			ret2, sideFrame = sideCap.read()
+			if ret1 and ret2:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				maskSide()
+				switch()
+			
 		elif serinput == 2:
 			state = 3
 			print('change state to 3')
+			# -------------
+			if preState == 5 or preState == 1:
+				preState = state
+				sideCap.release()
+				waterCap = cv2.VideoCapture(2)
+			ret1, frontFrame = frontCap.read()
+			ret3, waterFrame = waterCap.read()
+			if ret1 and ret3:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+				waterFrame = cv2.resize(waterFrame, (640, 480))
+				maskAll()
+				switch()
+
 		elif serinput == 3:
 			state = 5
 			print('change state to 5')
+			# -------------
+			if preState != 1:
+				preState = state
+				waterCap.release()
+				sideCap = cv2.VideoCapture(1)
+			ret1, frontFrame = frontCap.read()
+			ret2, sideFrame = sideCap.read()
+			if ret1 and ret2:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				maskSide()
+				switch()
+
 		elif serinput == 4:
 			state = 9
 			print('change state to 9')
+			# -------------
+			if preState == 5 or preState == 1:
+				preState = state
+				sideCap.release()
+				waterCap = cv2.VideoCapture(2)
+			ret1, frontFrame = frontCap.read()
+			ret3, waterFrame = waterCap.read()
+			if ret1 and ret3:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+				waterFrame = cv2.resize(waterFrame, (640, 480))
+				maskAll()
+				switch()
+
 		if state == 1 or state == 5:
 			if preState == state-1:
 				preState = state
