@@ -6,11 +6,11 @@ frontCap = cv2.VideoCapture(0)
 
 while True:
 	ret1, frontFrame = frontCap.read()
-# 	ret2, sideFrame = sideCap.read()
-	frontFrame = cv2.resize(frontFrame, (640, 480))
+	# ret2, sideFrame = sideCap.read()
 	# frontFrame = cv2.flip(frontFrame, -1)
 	# sideFrame = cv2.resize(sideFrame, (640, 480))
 	if ret1:
+		frontFrame = cv2.resize(frontFrame, (640, 480))
 		cv2.imshow('front', frontFrame)
 		# cv2.imshow('side', sideFrame)
 	else:
