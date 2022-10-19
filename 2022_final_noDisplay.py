@@ -247,7 +247,70 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
-	
+	global motorOutput
+	global tubeQue
+	global Iterm
+	global prevtime
+	sideratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.1, 1.2, 0, 0, 0, 0
+	upbound = 100
+	lowbound = 380
+	midpoint = 240
+	setpoint = 100
+	boundary = [0, 0, 0]
+	num = np.uint8(0)
+	for i in range(0, 480):
+		#chop the image
+		if boundary[0] == 0:
+			if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
+				if luCounter > 2:
+					boundary[0] = i
+					# cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
+				else :
+					luCounter += 1
+			else:
+				luCounter = 0
+		if boundary[1] == 0:
+			if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
+				if llCounter > 2:
+					boundary[1] = i
+					# cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
+				else :
+					llCounter += 1
+			else:
+				llCounter = 0
+		if boundary[2] == 0:
+			if (maskName['tubeMask'][midpoint][i][0] != num or maskName['tubeMask'][midpoint][i][1] != num or maskName['tubeMask'][midpoint][i][2] != num):
+				if ruCounter > 2:
+					boundary[2] = i
+					# cv2.circle(maskName['tubeShow'], (i, midpoint), 5, (255, 204, 0), -1)
+				else :
+					ruCounter += 1
+			else:
+				ruCounter = 0
+
+		
+	sideratio = 0.4
+	leftdiff = boundary[0]
+	rightdiff = boundary[1]
+	middiff = boundary[2] - setpoint
+	moveratio = (leftdiff-rightdiff) * turnratio - middiff * sideratio
+	# cv2.line(maskName['tubeShow'], (setpoint, 0), (setpoint, 480), (0, 255, 0), 1)
+	left = 128 + moveratio 
+	right = 128 - moveratio
+	left_str = str(int(left))
+	right_str = str(int(right))
+	if right < 100:
+		right_str = '0' + right_str
+	if left < 100:
+		left_str = '0' + left_str
+	motorOutput = left_str + right_str +'\n'
+	# tubeQue.append(now)
+	# motorOutput = tubeQue.pop(1)
+	# cv2.imshow('tube', maskName['tubeShow'])
+	# print('boundary:', boundary)
+	# print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
+	# print('now',now)
+	# print('motorOutput', motorOutput)
 
 def potAndSign(currentState):
 	global state
