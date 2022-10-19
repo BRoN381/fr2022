@@ -3,7 +3,7 @@ import numpy as np
 import serial
 from time import sleep
 
-ser = serial.Serial('/dev/ttyACM0', 9600)
+ser = serial.Serial('/dev/ttyUSB0', 9600)
 motorOutput = "000000\n"
 taskOutput = "900000\n"
 motorOrTask = True  #decide to send which output to arduino (true motor/ false task)
