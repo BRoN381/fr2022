@@ -8,4 +8,4 @@ while True:
         serinput = int(ser.readline().decode('utf-8'))
         print('serinput', serinput)
         sleep(0.5)
-        ser.write('000111')
+        ser.write('000111'.encode('utf-8'))
