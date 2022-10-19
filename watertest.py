@@ -296,7 +296,7 @@ def switch():
         potAndSign(state)
     elif state == 9:
         tubeDetect()
-variable['colorCode'] = 2
+variables['colorCode'] = 2
 # frontCap = cv2.VideoCapture(0)
 # sideCap = cv2.VideoCapture(1)
 waterCap = cv2.VideoCapture(0)
