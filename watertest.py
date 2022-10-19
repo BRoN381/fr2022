@@ -236,7 +236,7 @@ def waterDetect():  #input: four color mask img/ output: loop until water
     return False
 
 def tubeDetect():   #input: mask tube img/ output: (change global variable) motorOutput
-
+    return
 
 def potAndSign(currentState):
     global state
