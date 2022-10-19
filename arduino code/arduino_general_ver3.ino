@@ -13,7 +13,7 @@ const int motorPin[4] = { 2, 3, 4, 5 };                               //left for
 const int triangleTurnSpeed[6] = { 150, 150, 150, 150, 1700, 1700 };  //left forward, left backward, right forward, right backward, left turn time, right turn time
 const int squareTurnSpeed[4] = { 150, 150, 2500, 2000 };              //left forward, right backward, turn time, forward time
 const int circleTurnSpeed[3] = { 150, 150, 6000 };                    //left forward, right backward, turn time
-const int clawAngle[2] = { 30, 160 };                                 //0 open, 1 close
+const int clawAngle[2] = { 0, 100 };                                 //0 open, 1 close
 const int grab_distance = 9;
 String colorArray[5] = { "none", "red", "yellow", "blue", "black" };
 
@@ -248,15 +248,45 @@ void grabFruit() {
       stepperMove++;
     }
     clawServo.write(clawAngle[1]);
-    delay(500);
+    delay(1500);
     myStepper.step(-100 * stepperMove);
-    moveMotor(150, 150);
+    analogWrite(motorPin[1], 150);  //back to middle
+    analogWrite(motorPin[2], 150);
+    delay(3000);
+    moveMotor(128, 128);
+    delay(2000);
+    stopMotor();
+    analogWrite(motorPin[3], 150);
+    analogWrite(motorPin[0], 150);
+    delay(3000);
+    stopMotor();
+    moveMotor(150, 150);  // to next white pot
     delay(20000);
+    stopMotor();
+    analogWrite(motorPin[0], 150);  // right close
+    analogWrite(motorPin[3], 150);
+    delay(3000);
+    moveMotor(128, 128);
+    delay(2000);
+    stopMotor();
+    analogWrite(motorPin[1], 150);
+    analogWrite(motorPin[2], 150);
+    delay(3000);
     stopMotor();
     myStepper.step(100 * stepperMove);
     clawServo.write(clawAngle[0]);
     myStepper.step(-100 * stepperMove);
     stepperMove = 0;
+    analogWrite(motorPin[1], 150);
+    analogWrite(motorPin[2], 150);
+    delay(3000);
+    moveMotor(128, 128);
+    delay(2000);
+    stopMotor();
+    analogWrite(motorPin[3], 150);
+    analogWrite(motorPin[0], 150);
+    delay(3000);
+    stopMotor();
   }
 }
 
