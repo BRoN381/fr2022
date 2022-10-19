@@ -22,13 +22,13 @@ for i in range(640):
 maskLowwerBound = [[  0,128,198], [  0,117,  0], [  0, 42,136], [  0,174,146], [  0,138,190], [ 74, 85,  0], [ 31,  0, 14]]
 maskUpperBound  = [[ 19,253,255], [  9,223,186], [179,255,255], [179,255,255], [ 41,255,255], [108,255,255], [ 71,255,111]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
-state = 1
+state = 0
 
 def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
 	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
 	sideHsv=cv2.cvtColor(sideFrame,cv2.COLOR_BGR2HSV)
 	waterHsv=cv2.cvtColor(waterFrame,cv2.COLOR_BGR2HSV)
-	for i in range(3):	#mask sign, pot, tube
+	for i in range(2):	#mask sign, pot, tube
 		mask = cv2.inRange(frontHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
 		maskName[list(maskName)[i]] = cv2.bitwise_and(frontFrame,frontFrame,mask=mask)
 	maskName['signMask'] = cv2.cvtColor(maskName['signMask'],cv2.COLOR_BGR2GRAY)
@@ -39,9 +39,12 @@ def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign
 		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
 		maskName[list(maskName)[i]] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
 		maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
+	mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[2]),np.array(maskUpperBound[2]))
+	maskName['tubeMask'] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
 
 def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: None, 1: left tri, 2: right tri, 3: square, 4: circle) and return True
 	contours, hierarchy = cv2.findContours(maskName['signMask'], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  
+	maskName['signShow'] = frontFrame.copy()
 	# x,y,w,h=-1,-1,-1,-1
 	for cnt in contours:
 		area = cv2.contourArea(cnt)  
@@ -91,6 +94,7 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 	return False
 
 def potDetect():	#input: mask pot img/ output: (change global variable) motorOutput
+	maskName['potShow'] = frontFrame.copy()
 	global motorOutput
 	global taskOutput
 	turnratio = 0.3
@@ -171,10 +175,10 @@ def colorDetect():	#input: four color mask img/ output: (change global variable)
 		for cnt in contours:
 			if cv2.contourArea(cnt) > 7000: 
 				if state ==  1:
-					variables['colorCode'] = i
+					variables['colorCode'] = i #0~3
 					return True
 				elif state == 5:
-					variables['colorCode'] = i+4
+					variables['colorCode'] = i+4 #4~7
 					return True
 	return False
 	# maskName[list(maskName)[variables['colorCode']]] = cv2.cvtColor(maskName[list(maskName)[variables['colorCode']]],cv2.COLOR_GRAY2BGR)
@@ -218,7 +222,7 @@ def fruitDetect():
 	return True
 
 def waterDetect():	#input: four color mask img/ output: loop until water
-	contours, hierarchy = cv2.findContours(maskName[list(maskName)[variables['colorCode']+7]], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+	contours, hierarchy = cv2.findContours(maskName[list(maskName)[variables['colorCode']+3]], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	global motorOutput
 	global taskOutput
 	global motorOrTask
@@ -233,7 +237,7 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 				motorOutput = '030030\n'
 			elif x+w/2 > 340:
 				cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-				motorOutput = '850850\n'
+				motorOutput = '830830\n'
 			else:
 				if y+h/2 < 300:
 					cv2.putText(waterFrame, "stepper forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
@@ -254,7 +258,7 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
-	def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
+	maskName['tubeShow'] = frontFrame.copy()
 	global motorOutput
 	global tubeQue
 	global Iterm
@@ -380,7 +384,6 @@ def switch():
 		potAndSign(state)
 	elif state == 9:
 		tubeDetect()
-variables['colorCode'] = 0
 frontCap = cv2.VideoCapture(0)
 sideCap = cv2.VideoCapture(2)
 waterCap = cv2.VideoCapture(1)
