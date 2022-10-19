@@ -4,7 +4,7 @@ import serial
 import time
 
 ser = serial.Serial('/dev/ttyUSB0', 9600)
-# ser = serial.Serial('COM17', 9600)
+# ser = serial.Serial('COM18', 9600)
 
 motorOutput = "000000\n"
 taskOutput = "900000\n"
@@ -21,8 +21,8 @@ for i in range(640):
 	pixelcount.append(0)
 
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  0,128,198], [  0,117,  0], [  0, 42,136], [  0,174,146], [  0,138,190], [ 74, 85,  0], [ 31,  0, 14]]
-maskUpperBound  = [[ 19,253,255], [  9,223,186], [179,255,255], [179,255,255], [ 41,255,255], [108,255,255], [ 71,255,111]]
+maskLowwerBound = [[  0,128,198], [  0,117,  0], [  0, 42,136], [  0,174,146], [  0,138,190], [ 88, 28,  0], [ 31,  0, 14]]
+maskUpperBound  = [[ 19,253,255], [  9,223,186], [179,255,255], [179,255,255], [ 41,255,255], [121,255,255], [ 71,255,111]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
 state = 0
 
@@ -236,7 +236,7 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 			cv2.circle(waterFrame, (int(x+w/2), int(y+h/2)), 7, (255, 255, 255), -1)
 			if x+w/2 < 300:
 				cv2.putText(waterFrame, "motor forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
-				motorOutput = '030030\n'
+				motorOutput = '032032\n'
 			elif x+w/2 > 340:
 				cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
 				motorOutput = '830830\n'
@@ -387,8 +387,8 @@ def switch():
 	elif state == 9:
 		tubeDetect()
 # frontCap = cv2.VideoCapture(0)
-sideCap = cv2.VideoCapture(0)
-waterCap = cv2.VideoCapture(1)
+sideCap = cv2.VideoCapture(1)
+waterCap = cv2.VideoCapture(0)
 ser.write(motorOutput.encode('utf-8'))
 state = 6
 variables['colorCode'] = 6
