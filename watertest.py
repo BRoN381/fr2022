@@ -20,8 +20,8 @@ for i in range(70):
 
 
 #                       sign            pot             tube           red          yellow          blue            black
-maskLowwerBound = [[  0,166,158], [  0,117,  0], [   0,125,  0], [  0,188,  0], [ 12,184, 91], [ 86,  0,243], [  0,  0,  0]]
-maskUpperBound  = [[  8,255,255], [  9,223,186], [ 179,255,255], [ 22,255,255], [ 31,255,192], [117,192,255], [179, 95,164]]
+maskLowwerBound = [[  0,166,158], [  0,117,  0], [   0,125,  0], [  0,188,  0], [ 12,184, 91], [ 89, 45,127], [  0,  0,  0]]
+maskUpperBound  = [[  8,255,255], [  9,223,186], [ 179,255,255], [ 22,255,255], [ 31,255,192], [129,255,245], [179, 95,164]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow']) 
 state = 0
 
@@ -391,7 +391,7 @@ def switch():
         potAndSign(state)
     elif state == 9:
         tubeDetect()
-
+variable['colorCode'] = 2
 # frontCap = cv2.VideoCapture(0)
 # sideCap = cv2.VideoCapture(1)
 waterCap = cv2.VideoCapture(0)
