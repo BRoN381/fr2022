@@ -11,19 +11,20 @@ const int outputPinLoc[10] = { A0, 2, 3, 4, 5, 6, 7, 8, 9, A1 };      //A0 servo
 const int buttonPin[5] = { 34, 36, 38, 40, 42 };                      //34 state lock, 35~38 four states
 const int motorPin[4] = { 2, 3, 4, 5 };                               //left forward, left backward, right forward, right backward
 const int triangleTurnSpeed[6] = { 150, 150, 150, 150, 1700, 1700 };  //left forward, left backward, right forward, right backward, left turn time, right turn time
-const int squareTurnSpeed[4] = { 150, 150, 2200, 2000 };              //left forward, right backward, turn time, forward time
+const int squareTurnSpeed[4] = { 150, 150, 2500, 2000 };              //left forward, right backward, turn time, forward time
 const int circleTurnSpeed[3] = { 150, 150, 6000 };                    //left forward, right backward, turn time
-const int clawAngle[2] = { 25, 100 };                                 //0 open, 1 close
-const int grab_distance = 3;
+const int clawAngle[2] = { 30, 160 };                                 //0 open, 1 close
+const int grab_distance = 9;
 String colorArray[5] = { "none", "red", "yellow", "blue", "black" };
 
 SK6812 LED(3);
-Stepper myStepper(2048, 6, 8, 7, 9);
+// Stepper myStepper(2048, 6, 8, 7, 9);
+Stepper myStepper(2048, 7, 9, 6, 8);
 // Unistep2 myStepper(6, 7, 8, 9, 4096, 900);
 LiquidCrystal_I2C lcd(0x27, 16, 2);  //16,2為顯示器大小
 Servo clawServo;
 Ultrasonic ultrasonic(A3, A2);  //ultrasonic(trig, echo)
-Ultrasonic bottomSonic(A5, A4); 
+Ultrasonic bottomSonic(A5, A4);
 
 void readSerial();
 void stopMotor();
@@ -56,9 +57,7 @@ void setup() {
   clearLED();
   clawServo.attach(A0);
   clawServo.write(clawAngle[0]);
-  // myStepper.run();
   myStepper.setSpeed(15);
-
 }
 
 void loop() {
@@ -110,8 +109,8 @@ void readSerial() {
       } else {
         if (buffer[0] == '8') {
           runState = 3;
-          lpwm = 30;
-          rpwm = 30;
+          lpwm = 32;
+          rpwm = 32;
         } else {
           runState = 2;
           lpwm = (buffer[0] - '0') * 100 + (buffer[1] - '0') * 10 + (buffer[2] - '0');
@@ -135,8 +134,8 @@ void readRunState() {
   else if (runState == 3) reverseMoveMotor(lpwm, rpwm);
 }
 
-void readSign() {
-  switch (sign) {  //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
+void readSign() {  //0 none, 1 left triangle,2 right triangle, 3 square, 4 circle
+  switch (sign) {
     case 0:
       sign0();
       break;
@@ -147,7 +146,7 @@ void readSign() {
       triangleTurn(false);
       break;
     case 3:
-      squareTurn(false);
+      squareTurn(true);
       break;
     default:
       circleTurn();
@@ -183,7 +182,7 @@ void reverseMoveMotor(int left, int right) {  //main moving code
 
 void triangleTurn(bool type) {  //triangle sign, true for left, false for right
   if (type) {                   //turn left
-    squareTurn(true);
+    squareTurn(false);
     moveMotor(128, 128);
     delay(6500);
     stopMotor();
@@ -191,7 +190,7 @@ void triangleTurn(bool type) {  //triangle sign, true for left, false for right
     analogWrite(motorPin[2], triangleTurnSpeed[2]);
     delay(triangleTurnSpeed[4]);
   } else {  //turn right
-    squareTurn(false);
+    squareTurn(true);
     moveMotor(128, 128);
     delay(6500);
     stopMotor();
@@ -202,7 +201,7 @@ void triangleTurn(bool type) {  //triangle sign, true for left, false for right
   stopMotor();
 }
 
-void squareTurn(bool type) {  //true = left; false = right
+void squareTurn(bool type) {  //true = right; false = left
   stopMotor();
   if (type) {
     analogWrite(motorPin[0], squareTurnSpeed[0]);
@@ -246,27 +245,30 @@ void grabFruit() {
   if (servom) {
     while (ultrasonic.read() > grab_distance) {
       myStepper.step(100);
-      stepperMove ++;
+      stepperMove++;
     }
-    printLcd("task", "grab finish");
     clawServo.write(clawAngle[1]);
+    delay(500);
     myStepper.step(-100 * stepperMove);
-    moveMotor(50, 50);
-    delay(3000);
+    moveMotor(150, 150);
+    delay(20000);
     stopMotor();
     myStepper.step(100 * stepperMove);
     clawServo.write(clawAngle[0]);
     myStepper.step(-100 * stepperMove);
+    stepperMove = 0;
   }
 }
 
 void watering() {  //0 off, 1 on
   if (water == 0) digitalWrite(outputPinLoc[9], HIGH);
   else {
-    digitalWrite(outputPinLoc[9], LOW); 
-    delay(50000);
-    digitalWrite(outputPinLoc[9], HIGH);
-    myStepper.step(-100*stepperMove);
+    for (int i = 0; i < 55; i++) {
+      digitalWrite(outputPinLoc[9], LOW);
+      delay(1000);
+      digitalWrite(outputPinLoc[9], HIGH);
+    }
+    myStepper.step(-100 * stepperMove);
     stepperMove = 0;
     delay(1000);
     circleTurn();
@@ -275,26 +277,46 @@ void watering() {  //0 off, 1 on
 
 void colorDisplay() {  //0 off, 1 red, 2 yellow, 3 blue, 4 black
   if (color != 0) {
-    if (color < 4){ //fruit
+    if (color < 4) {  //fruit
       printLcd("The color is:", colorArray[color]);
       delay(5000);
       lcd.clear();
+      analogWrite(motorPin[0], 150);
+      analogWrite(motorPin[3], 150);
+      delay(3000);
       moveMotor(128, 128);
-      delay(1500);
-        //tba
-      while(bottomSonic.read()>20){
-        myStepper.step(-100);
-        stepperMove--;
-      } 
-    }else{  //water
-      printLcd("The color is:", colorArray[color-4]);
+      delay(2000);
+      stopMotor();
+      analogWrite(motorPin[1], 150);
+      analogWrite(motorPin[2], 150);
+      delay(3000);
+      moveMotor(128, 128);
+      delay(2000);
+      stopMotor();
+      //tba
+      while (bottomSonic.read() > 22) {
+        myStepper.step(100);
+        stepperMove++;
+      }
+
+    } else {  //water
+      printLcd("The color is:", colorArray[color - 4]);
       delay(5000);
       lcd.clear();
-      moveMotor(100, 100);
-      delay(3000);  // tba
+      analogWrite(motorPin[0], 150);
+      analogWrite(motorPin[3], 150);
+      delay(2500);
+      moveMotor(128, 128);
+      delay(750);
+      stopMotor();
+      analogWrite(motorPin[1], 150);
+      analogWrite(motorPin[2], 150);
+      delay(2500);
+      moveMotor(128, 128);
+      delay(1500);
+      stopMotor();
       myStepper.step(10000);  //tba
     }
-    
   }
 }
 
