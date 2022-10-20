@@ -3,8 +3,8 @@ import numpy as np
 import serial
 import time
 
-# ser = serial.Serial('COM17', 9600)
-ser = serial.Serial('/dev/ttyUSB0', 9600)
+ser = serial.Serial('COM17', 9600)
+# ser = serial.Serial('/dev/ttyUSB0', 9600)
 
 motorOutput = "000000\n"
 taskOutput = "900000\n"
@@ -149,8 +149,8 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 	rightdiff = boundary[3] - boundary[2]
 	moveratio = (leftdiff-rightdiff)*turnratio
 	#show density
-	for i in range(640):
-		if pixelcount[i] != 0:
+	# for i in range(640):
+		# if pixelcount[i] != 0:
 	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (i, 480), (i, 480-pixelcount[i]), (255, 255, 0), 1)
 	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[0], 480), (boundary[0], 0), (0, 0, 255), 1)
 	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[1], 480), (boundary[1], 0), (0, 0, 255), 1)
