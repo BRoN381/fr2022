@@ -24,9 +24,8 @@ for i in range(640):
 maskLowwerBound = [[  0, 69,212], [  0, 28, 45], [ 51,115,170], [  0,174,146], [  2,  0,215], [ 74, 85,  0], [ 84,  0, 53]]
 maskUpperBound  = [[  7,233,255], [ 10,235,255], [179,255,255], [179,255,255], [101, 47,255], [108,255,255], [132, 65,255]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
-state = 0
-preState = 0
-
+state = 2
+preState = 1
 def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
 	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
 	waterHsv=cv2.cvtColor(waterFrame,cv2.COLOR_BGR2HSV)
@@ -396,7 +395,7 @@ def switch():
 frontCap = cv2.VideoCapture(2)
 waterCap = cv2.VideoCapture(0)
 ser.write(motorOutput.encode('utf-8'))
-state = 8
+state = 0
 while True:
 	while ser.in_waiting:
 		serinput = int(ser.readline().decode('utf-8'))
@@ -522,6 +521,6 @@ while True:
 		break
 		
 frontCap.release()
-sideCap.release()
+# sideCap.release()
 waterCap.release()
 cv2.destroyAllWindows()
