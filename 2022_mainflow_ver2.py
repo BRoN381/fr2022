@@ -3,8 +3,8 @@ import numpy as np
 import serial
 import time
 
-# ser = serial.Serial('COM17', 9600)
-ser = serial.Serial('/dev/ttyUSB0', 9600)
+ser = serial.Serial('COM18', 9600)
+# ser = serial.Serial('/dev/ttyUSB0', 9600)
 
 motorOutput = "000000\n"
 taskOutput = "900000\n"
@@ -21,8 +21,8 @@ for i in range(640):
 	pixelcount.append(0)
 
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  0,128,198], [  0,117,  0], [ 51,115,170], [  0,174,146], [  0,138,190], [ 74, 85,  0], [ 31,  0, 14]]
-maskUpperBound  = [[ 19,253,255], [  9,223,186], [179,255,255], [179,255,255], [ 41,255,255], [108,255,255], [ 71,255,111]]
+maskLowwerBound = [[  0, 69,212], [  0, 28, 45], [ 51,115,170], [  0,174,146], [  2,  0,215], [ 74, 85,  0], [ 84,  0, 53]]
+maskUpperBound  = [[  7,233,255], [ 10,235,255], [179,255,255], [179,255,255], [101, 47,255], [108,255,255], [132, 65,255]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
 state = 0
 preState = 0
@@ -271,11 +271,11 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
-	maskName['tubeShow'] = frontFrame.copy()
+	maskName['tubeShow'] = waterFrame.copy()
 	global motorOutput
 	global Iterm
 	global prevtime
-	sideratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.1, 1.2, 0, 0, 0, 0
+	sideratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.2, 1.2, 0, 0, 0, 0
 	upbound = 100
 	lowbound = 380
 	midpoint = 240
@@ -311,7 +311,7 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 					ruCounter += 1
 			else:
 				ruCounter = 0
-	sideratio = 0.4
+	
 	leftdiff = boundary[0]
 	rightdiff = boundary[1]
 	middiff = boundary[2] - setpoint
@@ -393,8 +393,8 @@ def switch():
 	elif state == 9:
 		tubeDetect()
 		
-frontCap = cv2.VideoCapture(0)
-waterCap = cv2.VideoCapture(2)
+frontCap = cv2.VideoCapture(2)
+waterCap = cv2.VideoCapture(0)
 ser.write(motorOutput.encode('utf-8'))
 state = 8
 while True:
@@ -438,7 +438,6 @@ while True:
 			if ret1 and ret3:
 				frontFrame = cv2.resize(frontFrame, (640, 480))
 				frontFrame = cv2.flip(frontFrame, -1)
-				sideFrame = cv2.resize(sideFrame, (640, 480))
 				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 				waterFrame = cv2.resize(waterFrame, (640, 480))
 				maskAll()
@@ -474,7 +473,6 @@ while True:
 			if ret1 and ret3:
 				frontFrame = cv2.resize(frontFrame, (640, 480))
 				frontFrame = cv2.flip(frontFrame, -1)
-				sideFrame = cv2.resize(sideFrame, (640, 480))
 				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 				waterFrame = cv2.resize(waterFrame, (640, 480))
 				maskAll()
@@ -498,13 +496,13 @@ while True:
 				if preState == state-1:
 					preState = state
 					sideCap.release()
-					waterCap = cv2.VideoCapture(2)
+					waterCap = cv2.VideoCapture(0)
 			ret1, frontFrame = frontCap.read()
 			ret3, waterFrame = waterCap.read()
 			if ret1 and ret3:
 				frontFrame = cv2.resize(frontFrame, (640, 480))
 				frontFrame = cv2.flip(frontFrame, -1)
-				sideFrame = cv2.resize(sideFrame, (640, 480))
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
 				waterFrame = cv2.resize(waterFrame, (640, 480))
 				maskAll()
