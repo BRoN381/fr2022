@@ -159,7 +159,7 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 			# maskName['potShow'] = cv2.line(maskName['potShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
 			# maskName['potShow'] = cv2.line(maskName['potShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
 	if abs(leftdiff-rightdiff) < 25:
-		# cv2.putText(maskName['potShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+		cv2.putText(maskName['potShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
 	elif leftdiff > rightdiff:
 		cv2.putText(maskName['potShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
 	else:
