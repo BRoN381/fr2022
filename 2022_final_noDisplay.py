@@ -4,6 +4,8 @@ import serial
 import time
 
 ser = serial.Serial('COM17', 9600)
+# ser = serial.Serial('/dev/ttyUSB0', 9600)
+
 motorOutput = "000000\n"
 taskOutput = "900000\n"
 motorOrTask = True 	#decide to send which output to arduino (true motor/ false task)
@@ -19,15 +21,28 @@ for i in range(640):
 	pixelcount.append(0)
 
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  0,128,198], [  0,117,  0], [  0, 42,136], [  0,174,146], [  0,138,190], [ 74, 85,  0], [ 31,  0, 14]]
-maskUpperBound  = [[ 19,253,255], [  9,223,186], [179,255,255], [179,255,255], [ 41,255,255], [108,255,255], [ 71,255,111]]
+maskLowwerBound = [[  0,101,213], [  0, 55, 32], [  0,115,130], [ 0,128,213], [ 10,119,245], [ 99, 36,241], [ 86,  0, 24]]
+maskUpperBound  = [[  8,229,255], [ 15,217,255], [179,255,255], [ 14,235,255], [ 42,219,255], [121,176,255], [179,221,166]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
-state = 1
-
+state = 2
+preState = 1
 def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
 	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
-	sideHsv=cv2.cvtColor(sideFrame,cv2.COLOR_BGR2HSV)
 	waterHsv=cv2.cvtColor(waterFrame,cv2.COLOR_BGR2HSV)
+	for i in range(2):	#mask sign, pot, tube
+		mask = cv2.inRange(frontHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
+		maskName[list(maskName)[i]] = cv2.bitwise_and(frontFrame,frontFrame,mask=mask)
+	maskName['signMask'] = cv2.cvtColor(maskName['signMask'],cv2.COLOR_BGR2GRAY)
+	for i in range(7, 11):	#mask water four color
+		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
+		maskName[list(maskName)[i]] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
+		maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
+		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[2]),np.array(maskUpperBound[2]))
+		maskName['tubeMask'] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
+
+def maskSide():	#process masks	input: three caps/ output: eleven masked img (sign, pot, tube, 4 colors)
+	frontHsv=cv2.cvtColor(frontFrame,cv2.COLOR_BGR2HSV)
+	sideHsv=cv2.cvtColor(sideFrame,cv2.COLOR_BGR2HSV)
 	for i in range(3):	#mask sign, pot, tube
 		mask = cv2.inRange(frontHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
 		maskName[list(maskName)[i]] = cv2.bitwise_and(frontFrame,frontFrame,mask=mask)
@@ -35,13 +50,11 @@ def maskAll():	#process masks	input: three caps/ output: eleven masked img (sign
 	for i in range(3, 7):	#mask side four color
 		mask = cv2.inRange(sideHsv,np.array(maskLowwerBound[i]),np.array(maskUpperBound[i]))
 		maskName[list(maskName)[i]] = cv2.bitwise_and(sideHsv,sideHsv,mask=mask)
-	for i in range(7, 11):	#mask water four color
-		mask = cv2.inRange(waterHsv,np.array(maskLowwerBound[i-4]),np.array(maskUpperBound[i-4]))
-		maskName[list(maskName)[i]] = cv2.bitwise_and(waterFrame, waterFrame,mask=mask)
-		maskName[list(maskName)[i]] = cv2.cvtColor(maskName[list(maskName)[i]],cv2.COLOR_BGR2GRAY)
 
 def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: None, 1: left tri, 2: right tri, 3: square, 4: circle) and return True
 	contours, hierarchy = cv2.findContours(maskName['signMask'], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  
+	# maskName['signShow'] = frontFrame.copy()
+	global motorOutput
 	# x,y,w,h=-1,-1,-1,-1
 	for cnt in contours:
 		area = cv2.contourArea(cnt)  
@@ -52,6 +65,7 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 			corners = len(vertices)  
 			x, y, w, h = cv2.boundingRect(vertices)  
 			# cv2.putText(maskName['signShow'], str(area), (x, y - 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+			# cv2.drawContours(maskName['signShow'], cnt, -1, (0, 255, 0), 3) 
 			if corners==3:
 				#cv2.putText(maskName['signShow'],"triangle",(x,y-5),cv2.FONT_HERSHEY_SIMPLEX,1,(0,255,0),2)
 				newapp = np.ravel(vertices)
@@ -85,6 +99,8 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 				variables['signCode'] = '4'
 				# cv2.imshow('sign', maskName['signShow'])
 				return True
+		elif area > 7000:
+			motorOutput = '128128\n'
 	# cv2.putText(maskName['signShow'], "None", (10, 480-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 	# cv2.imshow('sign', maskName['signShow'])
 	return False
@@ -92,6 +108,7 @@ def signDetect():	#input: mask sign img/ output: (int)variables['signCode'] (0: 
 def potDetect():	#input: mask pot img/ output: (change global variable) motorOutput
 	global motorOutput
 	global taskOutput
+	# maskName['potShow'] = frontFrame.copy()
 	turnratio = 0.3
 	firstcoor = -1
 	upbound = 250
@@ -134,19 +151,19 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 	#show density
 	for i in range(640):
 		if pixelcount[i] != 0:
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (i, 480), (i, 480-pixelcount[i]), (255, 255, 0), 1)
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[0], 480), (boundary[0], 0), (0, 0, 255), 1)
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[1], 480), (boundary[1], 0), (0, 0, 255), 1)
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[2], 480), (boundary[2], 0), (0, 0, 255), 1)
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[3], 480), (boundary[3], 0), (0, 0, 255), 1)
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
-			# maskName['potShow'] = cv2.line(maskName['potShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
-	if abs(leftdiff-rightdiff) < 25:
-		# cv2.putText(maskName['potShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	elif leftdiff > rightdiff:
-		# cv2.putText(maskName['potShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
-	else:
-		# cv2.putText(maskName['potShow'], "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (i, 480), (i, 480-pixelcount[i]), (255, 255, 0), 1)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[0], 480), (boundary[0], 0), (0, 0, 255), 1)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[1], 480), (boundary[1], 0), (0, 0, 255), 1)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[2], 480), (boundary[2], 0), (0, 0, 255), 1)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[3], 480), (boundary[3], 0), (0, 0, 255), 1)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
+	# 		maskName['potShow'] = cv2.line(maskName['potShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
+	# if abs(leftdiff-rightdiff) < 25:
+	# 	cv2.putText(maskName['potShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+	# elif leftdiff > rightdiff:
+	# 	cv2.putText(maskName['potShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+	# else:
+	# 	cv2.putText(maskName['potShow'], "turn left", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
 	left = 128 + moveratio 
 	right = 128 - moveratio
 	left_str = str(int(left))
@@ -156,9 +173,9 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 	if left < 100:
 		left_str = '0' + left_str
 	motorOutput = left_str + right_str +'\n'
-	# print('boundary:', boundary)
-	# print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
-	# print(motorOutput)
+	print('boundary:', boundary)
+	print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
+	print(motorOutput)
 	# cv2.imshow('pot', maskName['potShow'])
 	# cv2.imshow('pot', maskName['potShow'])
 
@@ -181,19 +198,23 @@ def colorDetect():	#input: four color mask img/ output: (change global variable)
 def findFruitContour(img,i):
 	contours, hierarchy = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  
 	for cnt in contours:
-		# cv2.drawContours(maskName['fruitShow'], cnt, -1, (0, 255, 0), 3)
+		cv2.drawContours(maskName['fruitShow'], cnt, -1, (0, 255, 0), 3)
 		area = cv2.contourArea(cnt)  
 		if area >25000:  
-			# x, y, w, h = cv2.boundingRect(cv2.approxPolyDP(cnt, cv2.arcLength(cnt, True) * 0.02, True))  
-			# cv2.putText(maskName['fruitShow'], str(area), (x, y - 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-			# cv2.putText(maskName['fruitShow'], fruitName[i], (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+			
+			x, y, w, h = cv2.boundingRect(cv2.approxPolyDP(cnt, cv2.arcLength(cnt, True) * 0.02, True))  
+			cv2.putText(maskName['fruitShow'], str(area), (x, y - 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+			cv2.putText(maskName['fruitShow'], fruitName[i], (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 			return True
+			# print(penColor[i])
 	return False
 
 def fruitDetect():
 	global motorOutput, taskOutput, motorOrTask
 	fruitFrame = waterFrame[50:420, 0:420]
 	maskName['fruitShow'] = fruitFrame.copy()
+	# cv2.imshow("vedio",frame)
 	hsv=cv2.cvtColor(fruitFrame,cv2.COLOR_BGR2HSV)
 	i = variables['colorCode']
 	lower=np.array(FruitColorHSV[i][:3])
@@ -202,13 +223,14 @@ def fruitDetect():
 	result = cv2.bitwise_and(fruitFrame,fruitFrame,mask=mask)
 	while findFruitContour(mask,i) == False:
 		motorOutput = "032032\n"
-		# cv2.imshow("result", result)
-		# cv2.imshow("contour", maskName['fruitShow'])
+		# print("inside the loop")
+		cv2.imshow("result", result)
+		cv2.imshow("contour", maskName['fruitShow'])
 		return False
 	taskOutput = "900010\n"
 	motorOrTask = False
-	# cv2.imshow("result", result)
-	# cv2.imshow("contour", maskName['fruitShow'])	
+	cv2.imshow("result", result)
+	cv2.imshow("contour", maskName['fruitShow'])	
 	return True
 
 def waterDetect():	#input: four color mask img/ output: loop until water
@@ -219,39 +241,40 @@ def waterDetect():	#input: four color mask img/ output: loop until water
 	for cnt in contours:
 		area = cv2.contourArea(cnt)
 		if area > 7000:
-			# cv2.drawContours(waterFrame, cnt, -1, (128, 0, 128), 3)
+			cv2.drawContours(waterFrame, cnt, -1, (128, 0, 128), 3)
 			x, y, w, h = cv2.boundingRect(cv2.approxPolyDP(cnt, cv2.arcLength(cnt, True) * 0.02, True))
 			cv2.circle(waterFrame, (int(x+w/2), int(y+h/2)), 7, (255, 255, 255), -1)
 			if x+w/2 < 300:
-				# cv2.putText(waterFrame, "motor forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+				cv2.putText(waterFrame, "motor forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
 				motorOutput = '030030\n'
 			elif x+w/2 > 340:
-				# cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+				cv2.putText(waterFrame, "motor backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
 				motorOutput = '850850\n'
 			else:
 				if y+h/2 < 300:
-					# cv2.putText(waterFrame, "stepper forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+					cv2.putText(waterFrame, "stepper forward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
 					taskOutput = '902000\n'
 					motorOrTask = False
 				elif y+h/2 > 340:
-					# cv2.putText(waterFrame, "stepper backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+					cv2.putText(waterFrame, "stepper backward", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
 					taskOutput = '901000\n'
 					motorOrTask = False
 				else:
-					# cv2.putText(waterFrame, "water!!", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
+					cv2.putText(waterFrame, "water!!", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (128, 0, 128), 2)
 					taskOutput = '900100\n'
 					motorOrTask = False
 					return True
-		# cv2.rectangle(waterFrame, (300,220), (340, 260), (255, 255, 255), 3)
-	# cv2.imshow('result', waterFrame)
+		cv2.rectangle(waterFrame, (300,220), (340, 260), (255, 255, 255), 3)
+	# maskName[list(maskName)[variables['colorCode']]] = cv2.cvtColor(maskName[list(maskName)[variables['colorCode']]],cv2.COLOR_GRAY2BGR)
+	cv2.imshow('result', waterFrame)
 	return False
 
 def tubeDetect():	#input: mask tube img/ output: (change global variable) motorOutput
+	maskName['tubeShow'] = waterFrame.copy()
 	global motorOutput
-	global tubeQue
 	global Iterm
 	global prevtime
-	sideratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.1, 1.2, 0, 0, 0, 0
+	sideratio, turnratio, luCounter, llCounter ,ruCounter, rlCounter = 0.2, 1.2, 0, 0, 0, 0
 	upbound = 100
 	lowbound = 380
 	midpoint = 240
@@ -264,7 +287,7 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 			if (maskName['tubeMask'][upbound][i][0] != num or maskName['tubeMask'][upbound][i][1] != num or maskName['tubeMask'][upbound][i][2] != num):
 				if luCounter > 2:
 					boundary[0] = i
-					# cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
+					cv2.circle(maskName['tubeShow'], (i, upbound), 5, (255, 204, 0), -1)
 				else :
 					luCounter += 1
 			else:
@@ -273,7 +296,7 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 			if (maskName['tubeMask'][lowbound][i][0] != num or maskName['tubeMask'][lowbound][i][1] != num or maskName['tubeMask'][lowbound][i][2] != num):
 				if llCounter > 2:
 					boundary[1] = i
-					# cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
+					cv2.circle(maskName['tubeShow'], (i, lowbound), 5, (255, 204, 0), -1)
 				else :
 					llCounter += 1
 			else:
@@ -282,19 +305,17 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 			if (maskName['tubeMask'][midpoint][i][0] != num or maskName['tubeMask'][midpoint][i][1] != num or maskName['tubeMask'][midpoint][i][2] != num):
 				if ruCounter > 2:
 					boundary[2] = i
-					# cv2.circle(maskName['tubeShow'], (i, midpoint), 5, (255, 204, 0), -1)
+					cv2.circle(maskName['tubeShow'], (i, midpoint), 5, (255, 204, 0), -1)
 				else :
 					ruCounter += 1
 			else:
 				ruCounter = 0
-
-		
-	sideratio = 0.4
+	
 	leftdiff = boundary[0]
 	rightdiff = boundary[1]
 	middiff = boundary[2] - setpoint
 	moveratio = (leftdiff-rightdiff) * turnratio - middiff * sideratio
-	# cv2.line(maskName['tubeShow'], (setpoint, 0), (setpoint, 480), (0, 255, 0), 1)
+	cv2.line(maskName['tubeShow'], (setpoint, 0), (setpoint, 480), (0, 255, 0), 1)
 	left = 128 + moveratio 
 	right = 128 - moveratio
 	left_str = str(int(left))
@@ -304,13 +325,10 @@ def tubeDetect():	#input: mask tube img/ output: (change global variable) motorO
 	if left < 100:
 		left_str = '0' + left_str
 	motorOutput = left_str + right_str +'\n'
-	# tubeQue.append(now)
-	# motorOutput = tubeQue.pop(1)
-	# cv2.imshow('tube', maskName['tubeShow'])
-	# print('boundary:', boundary)
-	# print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
-	# print('now',now)
-	# print('motorOutput', motorOutput)
+	cv2.imshow('tube', maskName['tubeShow'])
+	print('boundary:', boundary)
+	print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
+	print('motorOutput', motorOutput)
 
 def potAndSign(currentState):
 	global state
@@ -323,6 +341,7 @@ def potAndSign(currentState):
 			motorOrTask = False
 			taskOutput = '9'+variables['signCode']+'0000\n'
 			state = currentState + 1
+			preState = currentState
 			print('change state to', state)
 			variables['signCounter'] = 0
 		else:
@@ -337,6 +356,7 @@ def potAndColor(currentState):
 	if colorDetect():
 		if variables['colorCounter'] > 3:
 			state = 1 + currentState
+			preState = currentState
 			variables['colorCounter'] = 0
 			taskOutput = '90000'+str(variables['colorCode']+1)+'\n'
 			motorOrTask = False
@@ -354,6 +374,7 @@ def switch():
 	elif state == 2:
 		if fruitDetect():
 			state = 3
+			preState = 2
 	elif state == 3:
 		potAndSign(state)
 	elif state == 4:
@@ -363,64 +384,136 @@ def switch():
 	elif state == 6:
 		if waterDetect():
 			state = 7
+			preState = 6
 	elif state == 7:
 		potAndSign(state)
 	elif state == 8:
 		potAndSign(state)
 	elif state == 9:
 		tubeDetect()
-
-
-frontCap = cv2.VideoCapture(0)
-sideCap = cv2.VideoCapture(2)
-waterCap = cv2.VideoCapture(1)
+		
+frontCap = cv2.VideoCapture(1)
+waterCap = cv2.VideoCapture(0)
 ser.write(motorOutput.encode('utf-8'))
+state = 0
+preState = 0
 while True:
 	while ser.in_waiting:
 		serinput = int(ser.readline().decode('utf-8'))
-		# print('serinput', serinput)
+		print('serinput', serinput)
 		if motorOrTask == False: # wait until arduino finish task 
 			if serinput == 999:
 				motorOrTask = True
 			else:
-				# print('skip')
+				print('skip')
 				break
 		if serinput == 1:
 			state = 1
-			# print('change state to 1')
+			print('change state to 1')
+			# -------------
+
+			if preState != 5:
+				preState = state
+				waterCap.release()
+				sideCap = cv2.VideoCapture(1)
+			ret1, frontFrame = frontCap.read()
+			ret2, sideFrame = sideCap.read()
+			if ret1 and ret2:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				maskSide()
+				switch()
+			
 		elif serinput == 2:
 			state = 3
-			# print('change state to 3')
+			print('change state to 3')
+			# -------------
+			if preState == 5 or preState == 1:
+				preState = state
+				sideCap.release()
+				waterCap = cv2.VideoCapture(2)
+			ret1, frontFrame = frontCap.read()
+			ret3, waterFrame = waterCap.read()
+			if ret1 and ret3:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+				waterFrame = cv2.resize(waterFrame, (640, 480))
+				maskAll()
+				switch()
+
 		elif serinput == 3:
 			state = 5
-			# print('change state to 5')
+			print('change state to 5')
+			# -------------
+			if preState != 1:
+				preState = state
+				waterCap.release()
+				sideCap = cv2.VideoCapture(1)
+			ret1, frontFrame = frontCap.read()
+			ret2, sideFrame = sideCap.read()
+			if ret1 and ret2:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				maskSide()
+				switch()
+
 		elif serinput == 4:
 			state = 9
-			# print('change state to 9')
-		ret1, frontFrame = frontCap.read()
-		ret2, sideFrame = sideCap.read()
-		ret3, waterFrame = waterCap.read()
-		if ret1 and ret2 and ret3:
-			frontFrame = cv2.resize(frontFrame, (640, 480))
-			frontFrame = cv2.flip(frontFrame, -1)
-			sideFrame = cv2.resize(sideFrame, (640, 480))
-			waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
-			waterFrame = cv2.resize(waterFrame, (640, 480))
-			maskName['signShow'] = frontFrame.copy()
-			maskName['potShow'] = frontFrame.copy()
-			maskName['tubeShow'] = frontFrame.copy()
-			maskAll()
-			switch()
-			# fruitDetect()
-			# cv2.imshow('front', frontFrame)
-			# cv2.imshow('side', sideFrame)
-			# cv2.imshow('water', waterFrame)
+			print('change state to 9')
+			# -------------
+			if preState == 5 or preState == 1:
+				preState = state
+				sideCap.release()
+				waterCap = cv2.VideoCapture(2)
+			ret1, frontFrame = frontCap.read()
+			ret3, waterFrame = waterCap.read()
+			if ret1 and ret3:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+				waterFrame = cv2.resize(waterFrame, (640, 480))
+				maskAll()
+				switch()
+
+		if state == 1 or state == 5:
+			if preState == state-1:
+				preState = state
+				waterCap.release()
+				sideCap = cv2.VideoCapture(2)
+			ret1, frontFrame = frontCap.read()
+			ret2, sideFrame = sideCap.read()
+			if ret1 and ret2:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				sideFrame = cv2.resize(sideFrame, (640, 480))
+				maskSide()
+				switch()
+		else:
+			if state == 2 or state == 6:
+				if preState == state-1:
+					preState = state
+					sideCap.release()
+					waterCap = cv2.VideoCapture(0)
+			ret1, frontFrame = frontCap.read()
+			ret3, waterFrame = waterCap.read()
+			if ret1 and ret3:
+				frontFrame = cv2.resize(frontFrame, (640, 480))
+				frontFrame = cv2.flip(frontFrame, -1)
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+				waterFrame = cv2.rotate(waterFrame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+				waterFrame = cv2.resize(waterFrame, (640, 480))
+				maskAll()
+				switch()
+
 		if motorOrTask:
 			ser.write(motorOutput.encode('utf-8'))
-			# print('----ser motor----')
+			print('----ser motor----')
 		else:
 			ser.write(taskOutput.encode('utf-8'))
-			# print('----ser task----')
+			print('----ser task----')
 			print(taskOutput)
 		if cv2.waitKey(1)==ord("q"):
 			break
@@ -429,6 +522,6 @@ while True:
 		break
 		
 frontCap.release()
-sideCap.release()
+# sideCap.release()
 waterCap.release()
 cv2.destroyAllWindows()
