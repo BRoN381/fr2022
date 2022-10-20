@@ -3,8 +3,8 @@ import numpy as np
 import serial
 import time
 
-ser = serial.Serial('COM17', 9600)
-# ser = serial.Serial('/dev/ttyUSB0', 9600)
+# ser = serial.Serial('COM17', 9600)
+ser = serial.Serial('/dev/ttyUSB0', 9600)
 
 motorOutput = "000000\n"
 taskOutput = "900000\n"
