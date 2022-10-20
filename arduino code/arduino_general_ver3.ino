@@ -11,7 +11,7 @@ const int outputPinLoc[10] = { A0, 2, 3, 4, 5, 6, 7, 8, 9, A1 };      //A0 servo
 const int buttonPin[5] = { 34, 36, 38, 40, 42 };                      //34 state lock, 35~38 four states
 const int motorPin[4] = { 2, 3, 4, 5 };                               //left forward, left backward, right forward, right backward
 const int triangleTurnSpeed[6] = { 150, 150, 150, 150, 1700, 1700 };  //left forward, left backward, right forward, right backward, left turn time, right turn time
-const int squareTurnSpeed[4] = { 150, 150, 2500, 2000 };              //left forward, right backward, turn time, forward time
+const int squareTurnSpeed[4] = { 150, 150, 00, 2000 };              //left forward, right backward, turn time, forward time
 const int circleTurnSpeed[3] = { 150, 150, 6000 };                    //left forward, right backward, turn time
 const int clawAngle[2] = { 0, 100 };                                 //0 open, 1 close
 const int grab_distance = 9;
@@ -61,9 +61,10 @@ void setup() {
 }
 
 void loop() {
-  readStateButton();
-  readSerial();
-  readRunState();
+  // readStateButton();
+  // readSerial();
+  // readRunState();
+  squareTurn(false);
 }
 
 void readStateButton() {
@@ -315,13 +316,13 @@ void colorDisplay() {  //0 off, 1 red, 2 yellow, 3 blue, 4 black
       analogWrite(motorPin[3], 150);
       delay(3000);
       moveMotor(128, 128);
-      delay(2000);
+      delay(1500);
       stopMotor();
       analogWrite(motorPin[1], 150);
       analogWrite(motorPin[2], 150);
       delay(3000);
       moveMotor(128, 128);
-      delay(2000);
+      delay(3000);
       stopMotor();
       //tba
       while (bottomSonic.read() > 22) {
