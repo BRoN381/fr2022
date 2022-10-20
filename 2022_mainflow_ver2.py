@@ -3,8 +3,8 @@ import numpy as np
 import serial
 import time
 
-# ser = serial.Serial('COM18', 9600)
-ser = serial.Serial('/dev/ttyUSB0', 9600)
+ser = serial.Serial('COM18', 9600)
+# ser = serial.Serial('/dev/ttyUSB0', 9600)
 
 motorOutput = "000000\n"
 taskOutput = "900000\n"
@@ -21,8 +21,8 @@ for i in range(640):
 	pixelcount.append(0)
 
 #						sign 			pot 			tube 		   red 			yellow 			blue 			black
-maskLowwerBound = [[  0, 69,212], [  0, 28, 45], [ 51,115,170], [  0,174,146], [  2,  0,215], [ 74, 85,  0], [ 84,  0, 53]]
-maskUpperBound  = [[  7,233,255], [ 10,235,255], [179,255,255], [179,255,255], [101, 47,255], [108,255,255], [132, 65,255]]
+maskLowwerBound = [[  0,101,213], [  0, 55, 32], [  0,115,130], [ 0,128,213], [ 10,119,245], [ 99, 36,241], [ 86,  0, 24]]
+maskUpperBound  = [[  8,229,255], [ 15,217,255], [179,255,255], [ 14,235,255], [ 42,219,255], [121,176,255], [179,221,166]]
 maskName = dict.fromkeys(['signMask', 'potMask', 'tubeMask', 'redSideMask', 'yellowSideMask', 'blueSideMask', 'blackSideMask', 'redWaterMask', 'yellowWaterMask', 'blueWaterMask', 'blackWaterMask', 'potShow', 'signShow', 'tubeShow', 'fruitShow']) 
 state = 2
 preState = 1
@@ -151,15 +151,15 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 	#show density
 	for i in range(640):
 		if pixelcount[i] != 0:
-			maskName['potShow'] = cv2.line(maskName['potShow'], (i, 480), (i, 480-pixelcount[i]), (255, 255, 0), 1)
-			maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[0], 480), (boundary[0], 0), (0, 0, 255), 1)
-			maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[1], 480), (boundary[1], 0), (0, 0, 255), 1)
-			maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[2], 480), (boundary[2], 0), (0, 0, 255), 1)
-			maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[3], 480), (boundary[3], 0), (0, 0, 255), 1)
-			maskName['potShow'] = cv2.line(maskName['potShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
-			maskName['potShow'] = cv2.line(maskName['potShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (i, 480), (i, 480-pixelcount[i]), (255, 255, 0), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[0], 480), (boundary[0], 0), (0, 0, 255), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[1], 480), (boundary[1], 0), (0, 0, 255), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[2], 480), (boundary[2], 0), (0, 0, 255), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (boundary[3], 480), (boundary[3], 0), (0, 0, 255), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (0, upbound), (640, upbound), (0, 0, 255), 1)
+			# maskName['potShow'] = cv2.line(maskName['potShow'], (0, lowbound), (640, lowbound), (0, 0, 255), 1)
 	if abs(leftdiff-rightdiff) < 25:
-		cv2.putText(maskName['potShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
+		# cv2.putText(maskName['potShow'], "go straight", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
 	elif leftdiff > rightdiff:
 		cv2.putText(maskName['potShow'], "turn right", (10, 480-10), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 255), 2)
 	else:
@@ -176,7 +176,7 @@ def potDetect():	#input: mask pot img/ output: (change global variable) motorOut
 	print('boundary:', boundary)
 	print('leftdiff:', leftdiff, 'rightdiff:', rightdiff)
 	print(motorOutput)
-	cv2.imshow('pot', maskName['potShow'])
+	# cv2.imshow('pot', maskName['potShow'])
 	# cv2.imshow('pot', maskName['potShow'])
 
 def colorDetect():	#input: four color mask img/ output: (change global variable) colorSign and return True
@@ -396,6 +396,7 @@ frontCap = cv2.VideoCapture(2)
 waterCap = cv2.VideoCapture(0)
 ser.write(motorOutput.encode('utf-8'))
 state = 0
+preState = 0
 while True:
 	while ser.in_waiting:
 		serinput = int(ser.readline().decode('utf-8'))
